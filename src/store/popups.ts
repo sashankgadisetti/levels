@@ -11,7 +11,7 @@ export const usePopups = create<{
   clear(): void;
 }>((set) => ({
   queue: [],
-  push: (spec) => set((s) => ({ queue: [...s.queue, spec] })),
+  push: (spec) => set((s) => (s.queue.some((x) => x.id === spec.id) ? { queue: s.queue.map((x) => (x.id === spec.id ? spec : x)) } : { queue: [...s.queue, spec] })),
   shift: () => set((s) => ({ queue: s.queue.slice(1) })),
   clear: () => set({ queue: [] }),
 }));

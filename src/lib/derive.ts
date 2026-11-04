@@ -8,9 +8,9 @@ export const goldPriceOf = (r: Pick<RewardDef, "usd">, config: Config) => Math.m
 
 export const statValue = (s: State, id: StatId) => s.stats[id]?.value ?? 0;
 
-export function vitalMax(s: State) {
-  const vit = statValue(s, "VIT"), sense = statValue(s, "SENSE"), int = statValue(s, "INT");
-  return { hp: 100 + 10 * vit + 5 * sense, mp: 10 + 5 * int + 2 * sense, fatigue: 100 };
+/** The engine keeps HP, MP and Fatigue on a 0–100 scale (docs/04-architecture.md §5). */
+export function vitalMax(_s: State) {
+  return { hp: 100, mp: 100, fatigue: 100 };
 }
 
 /** Next local day boundary (dayEndsAt) strictly after `now`. */

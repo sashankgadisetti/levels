@@ -4,6 +4,7 @@ import { dispatch, gameStore, useGameState } from "../../store/game";
 import { getAutostart, getOracleApiKey, setAutostart, setOracleApiKey, useSettings } from "../../store/settings";
 import { useUi } from "../../store/ui";
 import { Btn, Field, Panel, Toggle } from "../ui/kit";
+import { askTheSystem, oracleSpentTodayUsd } from "../../oracle/wire";
 
 const DAYS: Weekday[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -19,6 +20,16 @@ export function Settings() {
   const [oracle, setOracle] = useState(cfg.oracle);
   const [apiKey, setApiKey] = useState("");
   const [auto, setAuto] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+  const ask = async () => {
+    if (!question.trim() || asking) return;
+    setAsking(true);
+    try {
+      const spec = await askTheSystem(question.trim());
+      toast(spec ? "[THE SYSTEM HAS ANSWERED]" : "[THE ORACLE IS SILENT]");
+    } finally { setAsking(false); }
+  };
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { void getOracleApiKey().then((k) => setApiKey(k ?? "")); void getAutostart().then(setAuto); }, []);
@@ -94,7 +105,13 @@ export function Settings() {
         <Field label="Enabled"><Toggle on={oracle.enabled} onChange={(v) => setOracle({ ...oracle, enabled: v })} label="Oracle enabled" /></Field>
         <Field label="Model"><input className="sys-input" value={oracle.model} onChange={(e) => setOracle({ ...oracle, model: e.target.value })} /></Field>
         <Field label="API key" hint="Stored on this device"><input className="sys-input" type="password" autoComplete="off" placeholder="sk-ant-…" value={apiKey} onChange={(e) => setApiKey(e.target.value)} onBlur={() => void setOracleApiKey(apiKey)} /></Field>
+        <Field label="Daily budget" hint="USD, stops calls when reached"><input className="sys-input num !w-28" type="number" min={0} step={0.05} value={oracle.dailyBudgetUsd} onChange={(e) => setOracle({ ...oracle, dailyBudgetUsd: Math.max(0, Number(e.target.value)) })} /></Field>
+        <Field label="Spent today"><span className="mono tone-gold">${oracleSpentTodayUsd().toFixed(3)}</span></Field>
         {!apiKey && <p className="sub m-0">[THE ORACLE IS SILENT. ADD AN API KEY TO ENABLE GENERATION.]</p>}
+        <Field label="Ask the System" hint="Opens a generated window"><div className="flex w-full gap-2">
+          <input className="sys-input flex-1" placeholder="Why is my VIT lagging?" value={question} maxLength={300} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void ask(); }} />
+          <Btn primary disabled={asking || !cfg.oracle.enabled || !apiKey} onClick={() => void ask()}>{asking ? "[…]" : "[ASK]"}</Btn>
+        </div></Field>
       </Panel>
 
       <div className="flex justify-end"><Btn primary onClick={() => { void setOracleApiKey(apiKey); save(); }}>[SAVE SETTINGS]</Btn></div>

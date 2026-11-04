@@ -13,8 +13,8 @@ export function DailyQuest() {
   const left = (nextDayEnd(s.config, now).getTime() - now.getTime()) / 1000;
   const prog = questProgress(q);
   const cfg = s.config;
-  const xp = prog.total * cfg.curves.xpPerGoal + (prog.total && prog.done === prog.total ? cfg.curves.fullClearBonus : 0);
-  const gold = prog.total * cfg.economy.goldPerGoal + (prog.total && prog.done === prog.total ? cfg.economy.goldFullClear : 0);
+  const xp = prog.total * cfg.curves.xpPerGoal + cfg.curves.fullClearBonus;
+  const gold = prog.total * cfg.economy.goldPerGoal + cfg.economy.goldFullClear;
   const cleared = q?.result === "clear" || (prog.total > 0 && prog.done === prog.total);
 
   return (

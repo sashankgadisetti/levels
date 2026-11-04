@@ -18,7 +18,7 @@ export function SystemPopup() {
       const parsed = parseSpec(payload);
       if (!parsed.success) { console.warn("[system] rejected spec", parsed.error); return; }
       const spec = { ...parsed.data, id: parsed.data.id ?? uid() };
-      setQueue((q) => (q.some((x) => x.id === spec.id) ? q : [...q, spec]));
+      setQueue((q) => (q.some((x) => x.id === spec.id) ? q.map((x) => (x.id === spec.id ? spec : x)) : [...q, spec]));
     });
     return () => { p.then((un) => un()); };
   }, []);

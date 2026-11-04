@@ -64,6 +64,15 @@ pub fn run() {
                 })
                 .build(),
         )
+        .on_window_event(|window, event| {
+            // Closing the main window hides it to the tray; "Quit" in the tray menu exits.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![show_system_window, hide_system_window])
         .setup(move |app| {
             // CmdOrCtrl+Shift+S: Cmd on macOS, Ctrl elsewhere.
