@@ -56,7 +56,7 @@ Exit criteria: the user can live on the app for a week without touching code.
 2. Exact daily targets: gym sessions/week and which days are rest days; study minutes/day; sleep hours target and bedtime; what counts as a "clean meal" (count per day, or a simple ✓).
 3. Day boundary: midnight, or 3 a.m. (recommended for late sleepers).
 4. Monthly real-world reward budget in dollars, and a first list of 5–10 rewards with links.
-5. OS (macOS / Windows / Linux) so the first packaged build targets it.
+5. ~~OS~~ — answered: **macOS**. First packaged build is a `.dmg`; Windows/Linux later.
 6. Whether to enable the Oracle from day one (needs an Anthropic API key) or run on template windows first.
 
 ## Risks
