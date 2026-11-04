@@ -17,6 +17,18 @@ Gold you earn buys real-world gear that makes you better, priced against a
 monthly budget. An optional **Oracle** lets Claude generate the System's
 windows at runtime (generative UI) within a strict, validated schema.
 
+## Status
+
+Working today: tray + global shortcuts, the main window (status, quests, rewards, settings), SQLite persistence, daily-quest/level-up/penalty System windows, notifications, launch at login, optional Oracle (Claude) windows validated by a Zod schema. Verified in CI-equivalent runs: typecheck, vitest, frontend build, and `cargo check` of the Tauri shell. Not yet verified on a real Mac: the packaged `.dmg`, activation-policy switching and pop-up placement on multi-monitor setups. No auto-updater yet.
+
+## Download / Build on macOS
+
+See [SETUP.md](SETUP.md): Xcode CLT + Rust + Node 20, `npm run tauri build`, then open the `.dmg` from `src-tauri/target/release/bundle/` (unsigned: right-click Open on first launch). The `Build macOS` GitHub Action produces the same `.dmg`.
+
+## How the pop-ups work
+
+The System windows are a second, frameless, transparent, always-on-top Tauri window (`system.html`). The main window asks Rust to `show_system_window`; Rust places it 24px from the top-right of the monitor under your cursor and shows it without taking focus, so it appears over whatever you are doing, even when the main window is hidden in the tray. Buttons that need the app call `open_main`, which focuses the main window and emits `levels://open-screen`.
+
 ## Docs
 
 | | |
