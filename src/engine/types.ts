@@ -35,7 +35,7 @@ export interface Config {
   oracle: { enabled: boolean; model: string; flavorModel: string; dailyBudgetUsd: number };
 }
 
-export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean }
+export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */ }
 export interface DailyQuest { date: YMD; goals: Goal[]; startedAt: ISO; closedAt?: ISO; result?: "clear" | "partial" | "fail"; xpEarned?: number; goldEarned?: number }
 
 export interface Item { id: string; defId: string; name: string; rarity: Rarity; description: string; consumable: boolean; obtainedAt: ISO }
@@ -44,7 +44,14 @@ export interface Title { id: string; name: string; effect: string; unlockedAt: I
 export interface Skill { id: string; name: string; kind: "passive" | "active"; effect: string; mpCost: number; cooldownHours: number; unlockedAt: ISO; lastUsedAt?: ISO }
 export interface Shadow { id: string; name: string; stat: StatId; rank: ShadowRank; epithet?: string; extractedAt: ISO; streakAtExtraction: number }
 export interface Streak { stat: StatId; current: number; best: number; lastDate?: YMD }
-export interface Penalty { startedAt: ISO; endsAt: ISO; date: YMD; missedGoalIds: string[]; cleared: boolean }
+export interface Penalty {
+  startedAt: ISO; endsAt: ISO; date: YMD; missedGoalIds: string[]; cleared: boolean;
+  /** makeup progress per missed goal id (target = ceil(original target / 2)) */
+  makeup?: Record<string, number>;
+  /** last date a "penalty persists" reminder was shown */
+  warnedDate?: YMD;
+}
+export interface PendingExtraction { stat: StatId; milestone: number; offeredAt: ISO }
 
 export interface State {
   version: 1;
@@ -67,6 +74,17 @@ export interface State {
   dungeonsCleared: number;
   gatesCleared: number;
   lastTickAt?: ISO;
+  // --- optional engine bookkeeping (added by the engine implementation) ---
+  quietUntil?: ISO;                                  // Stealth
+  monthKey?: string;                                 // "2026-11" of the last event (monthly reset)
+  warned?: { date: YMD; hours: number[] };           // warning popups already fired today
+  sprintArmed?: boolean;                             // next goal completion today pays 2x XP
+  xpBoostFor?: YMD;                                  // XP Boost applies to the close of this date
+  tenacityUsedWeek?: string;                         // ISO week "2026-W45"
+  pendingExtractions?: PendingExtraction[];
+  counters?: Record<string, number>;                 // title-condition counters
+  lastGymDate?: YMD;
+  queuedPopups?: SystemWindowSpec[];                 // held back by quiet hours / Stealth
 }
 
 export type Event =
@@ -85,7 +103,7 @@ export type Event =
   | { type: "REWARD_PURCHASED"; rewardId: string; at: ISO }
   | { type: "SHADOW_EXTRACTED"; stat: StatId; name: string; epithet?: string; at: ISO }
   | { type: "TITLE_EQUIPPED"; titleId: string; at: ISO }
-  | { type: "SKILL_USED"; skillId: string; at: ISO }
+  | { type: "SKILL_USED"; skillId: string; at: ISO; hours?: number /* Stealth duration, default 4 */ }
   | { type: "DUNGEON_CLEARED"; rank: HunterRank; minutes: number; bossName: string; at: ISO }
   | { type: "GATE_RESULT"; week: string; cleared: boolean; at: ISO }
   | { type: "TICK"; at: ISO }

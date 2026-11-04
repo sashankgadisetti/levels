@@ -26,3 +26,23 @@ export const EVENTS = {
 
 export const showSystemWindow = (payload: unknown) => invoke("show_system_window", { payload });
 export const hideSystemWindow = () => invoke("hide_system_window");
+
+export const SYSTEM_ACTION_EVENT = "levels://system-action";
+
+/** emit a Tauri event to all windows; no-op outside Tauri. */
+export async function emit(event: string, payload?: unknown): Promise<void> {
+  if (!isTauri()) return;
+  const { emit } = await import("@tauri-apps/api/event");
+  await emit(event, payload);
+}
+
+/** bring the main window to the front (no-op outside Tauri). */
+export async function focusMainWindow(): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const w = getCurrentWindow();
+    await w.show();
+    await w.setFocus();
+  } catch { /* ignore */ }
+}
