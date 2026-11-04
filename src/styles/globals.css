@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sl-bg: #050a14;
+  --color-sl-panel: rgba(8, 20, 40, 0.82);
+  --color-sl-cyan: #3fd8ff;
+  --color-sl-cyan-dim: #1b8fc2;
+  --color-sl-red: #ff3b5c;
+  --color-sl-gold: #ffcc4d;
+  --color-sl-purple: #9b5cff;
+  --font-display: "Orbitron", sans-serif;
+  --font-ui: "Rajdhani", "Exo 2", sans-serif;
+  --font-mono: "Share Tech Mono", monospace;
+}
+
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--color-sl-bg); color: var(--color-sl-cyan); font-family: var(--font-ui); }
+/* The pop-up System window is transparent. */
+html.system-page, body.system-page { background: transparent !important; overflow: hidden; }
