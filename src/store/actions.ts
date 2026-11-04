@@ -3,13 +3,15 @@ import type { StatId } from "../engine";
 import type { Action } from "../system/spec";
 import { focusMainWindow } from "../lib/tauri";
 import { gameStore } from "./game";
+import { MORE_PREFIX } from "./cadence";
+import { isSnoozeAction, recall, replayFolded, snooze } from "./snooze";
 import { useUi, type Screen } from "./ui";
 
 const OPEN: Record<string, Screen> = {
   "open:status": "status", "open:quest": "daily", "open:shop": "shop", "open:shadows": "shadows", "open:inventory": "inventory",
 };
 
-export function handleAction(action: Action): void {
+export function handleAction(action: Action, ctx: { windowId?: string } = {}): void {
   const { state, dispatch } = gameStore.getState();
   const ui = useUi.getState();
   if (OPEN[action.kind]) {
@@ -17,13 +19,18 @@ export function handleAction(action: Action): void {
     void focusMainWindow();
     return;
   }
+  if (isSnoozeAction(action)) { snooze(recall(ctx.windowId)); return; }
+  if (action.kind === "accept" && action.arg?.startsWith(MORE_PREFIX)) { replayFolded(action.arg); return; }
   if (!state) return;
   const goal = (id?: string) => state.today?.goals.find((g) => g.id === id);
   switch (action.kind) {
     case "progress:goal": {
-      const [id, d] = (action.arg ?? "").split(":");
+      // goal ids look like "2026-11-04:gym", so the delta is whatever follows the LAST colon
+      const arg = action.arg ?? "";
+      const cut = arg.lastIndexOf(":");
+      const id = arg.slice(0, cut);
       const g = goal(id);
-      const delta = Number(d);
+      const delta = Number(arg.slice(cut + 1));
       if (!g || !Number.isFinite(delta) || delta === 0) return;
       if (delta > 0) dispatch({ type: "GOAL_PROGRESS", goalId: id, delta });
       else dispatch({ type: "GOAL_SET", goalId: id, value: Math.max(0, g.current + delta) });

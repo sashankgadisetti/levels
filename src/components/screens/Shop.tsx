@@ -29,7 +29,7 @@ export function Shop() {
         <div className="mono tone-gold glow-gold text-[20px] pl-4">{s.gold} G</div>
       </div>
       {s.penalty && !s.penalty.cleared && s.config.penalty.lockShop && (
-        <div className="sys-card mb-3 text-center tone-red" style={{ borderColor: "var(--sl-red)" }}>[SHOP LOCKED: PENALTY ACTIVE]</div>
+        <div className="sys-card mb-3 text-center tone-red" style={{ borderColor: "var(--sl-red)" }}>The shop is locked while a penalty is active.</div>
       )}
       {tab === "system" ? <SystemTab /> : <RealTab />}
     </div>
@@ -44,7 +44,7 @@ function SystemTab() {
         <div key={it.name} className="sys-card flex flex-col items-center gap-2 text-center">
           <div className="grid h-11 w-11 place-items-center border border-[var(--sl-cyan)] font-[family-name:var(--font-head)]">&#9670;</div>
           <div className="grid min-h-10 place-items-center text-[17px] leading-tight">{it.name}</div>
-          <div className="text-[13px] tone-dim normal-case">{it.effect}</div>
+          <div className="copy dim !text-[15px]">{it.effect}</div>
           <div className="mono tone-gold">{it.price} G</div>
           <Btn sm disabled title="System items arrive in a later update">{s.gold >= it.price ? "[COMING SOON]" : "[INSUFFICIENT]"}</Btn>
         </div>
@@ -65,7 +65,7 @@ function RealTab() {
   const buy = (r: RewardDef) => {
     dispatch({ type: "REWARD_PURCHASED", rewardId: r.id });
     playSound("ding");
-    toast(`[PURCHASED] ${r.name}`);
+    toast(`Purchased: ${r.name}`);
     if (r.url) void openLink(r.url);
   };
 
@@ -73,7 +73,7 @@ function RealTab() {
     <div className="grid items-start gap-5" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
       <div className="grid gap-4">
         <Panel title="Reward Shelf" right={<span className="sub">{open.length} LISTED</span>}>
-          {open.length === 0 ? <Empty>No rewards listed. Name what you want to earn.</Empty> : (
+          {open.length === 0 ? <Empty>Add something you&apos;d actually buy to get better &mdash; gear, a book, a course. Earn the gold, then buy it.</Empty> : (
             <div className="grid gap-3">
               {open.map((r) => {
                 const price = goldPriceOf(r, cfg);
@@ -87,7 +87,7 @@ function RealTab() {
                         <div className="mt-1 flex flex-wrap gap-2">
                           {r.stat && <Chip>{statShort(cfg, r.stat)}</Chip>}
                           <Chip>{usd(r.usd)}</Chip>
-                          {over && <Chip tone="red">OVER BUDGET</Chip>}
+                          {over && <Chip tone="red">Over budget</Chip>}
                           {r.url && <Chip>LINK</Chip>}
                         </div>
                       </div>
@@ -109,7 +109,7 @@ function RealTab() {
         <AddReward />
         {bought.length > 0 && (
           <Panel title="Purchase Log">
-            <table className="w-full text-[15px]"><tbody>
+            <table className="w-full text-[16px]"><tbody>
               {bought.map((r) => (
                 <tr key={r.id} className="border-t border-[rgba(63,216,255,.15)]">
                   <td className="py-1">{r.name}</td><td className="mono text-right">{usd(r.usd)}</td><td className="mono tone-gold text-right">{r.goldPaid ?? "—"} G</td>
@@ -124,10 +124,10 @@ function RealTab() {
         <div className="grid gap-3 text-[17px]">
           <SBar value={s.spentThisMonthUsd} max={budget} tone={s.spentThisMonthUsd > budget ? "red" : "gold"} numbers={false} />
           <div className="grid gap-1" style={{ gridTemplateColumns: "1fr auto" }}>
-            <span className="tone-dim">BUDGET</span><b className="mono font-normal text-right">{usd(budget)}</b>
-            <span className="tone-dim">SPENT</span><b className="mono font-normal text-right">{usd(s.spentThisMonthUsd)}</b>
-            <span className="tone-dim">REMAINING</span><b className="mono tone-gold font-normal text-right" data-testid="remaining">{usd(Math.max(0, budget - s.spentThisMonthUsd))}</b>
-            <span className="tone-dim">RATE</span><b className="mono font-normal text-right">{cfg.economy.usdToGold} G / $</b>
+            <span className="tone-dim">Budget</span><b className="mono font-normal text-right">{usd(budget)}</b>
+            <span className="tone-dim">Spent</span><b className="mono font-normal text-right">{usd(s.spentThisMonthUsd)}</b>
+            <span className="tone-dim">Remaining</span><b className="mono tone-gold font-normal text-right" data-testid="remaining">{usd(Math.max(0, budget - s.spentThisMonthUsd))}</b>
+            <span className="tone-dim">Rate</span><b className="mono font-normal text-right">{cfg.economy.usdToGold} G / $</b>
           </div>
         </div>
       </Panel>
@@ -162,7 +162,7 @@ function AddReward() {
           </select>
         </div>
         <div className="flex items-center justify-between">
-          <span className="sub normal-case">{Number(price) > 0 ? `= ${goldPriceOf({ usd: Number(price) }, s.config)} gold` : ""}</span>
+          <span className="copy dim !text-[15px]">{Number(price) > 0 ? `= ${goldPriceOf({ usd: Number(price) }, s.config)} gold` : ""}</span>
           <Btn primary type="submit" disabled={!valid}>[+ ADD REWARD]</Btn>
         </div>
       </form>

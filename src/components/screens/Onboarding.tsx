@@ -27,7 +27,7 @@ export function Onboarding() {
       <AnimatePresence mode="wait">
         <motion.div key={step} initial={{ opacity: 0, scaleY: 0.1 }} animate={{ opacity: [0, 1, 0.4, 1, 0.7, 1], scaleY: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.45 }} className="w-full max-w-[600px]">
           {step === "accept" && (
-            <Panel accent={undefined} className="text-center">
+            <Panel accent={undefined} className="sys-pop text-center">
               <div className="sys-glyph"><span>!</span></div>
               <h1 className="sys-title">[NOTIFICATION]</h1>
               <hr className="sys-rule" />
@@ -40,7 +40,7 @@ export function Onboarding() {
             </Panel>
           )}
           {step === "refused" && (
-            <Panel accent="red" className="text-center pulse-warn">
+            <Panel accent="red" className="sys-pop text-center pulse-warn">
               <div className="sys-glyph"><span>!</span></div>
               <h1 className="sys-title">[REFUSAL]</h1>
               <hr className="sys-rule" />
@@ -49,7 +49,7 @@ export function Onboarding() {
             </Panel>
           )}
           {step === "name" && (
-            <Panel className="text-center">
+            <Panel className="sys-pop text-center">
               <h1 className="sys-title">[PLAYER REGISTRATION]</h1>
               <hr className="sys-rule" />
               <p className="sys-text my-4">[Enter your name, Player.]</p>
@@ -59,18 +59,18 @@ export function Onboarding() {
             </Panel>
           )}
           {step === "habits" && (
-            <Panel title="Daily Quest Objectives">
-              <p className="sys-text mb-3 text-[16px] tone-dim">[Review your daily targets. You can change them later in Settings.]</p>
+            <Panel title="Daily Quest Objectives" className="sys-pop">
+              <p className="copy dim mb-3">These are your daily goals. Adjust the targets now or change, add and remove goals later in Settings.</p>
               <div className="grid gap-2">
                 {habits.map((h, i) => (
                   <div key={h.id} className="sys-goal" style={{ gridTemplateColumns: "1fr auto" }}>
-                    <div className="n">{h.label}<small>({statLabel(state.config, h.stat)})</small></div>
+                    <div className="n">{h.label}<small>{statLabel(state.config, h.stat)}</small></div>
                     <div className="flex items-center gap-2">
                       <input type="number" min={h.kind === "check" ? 1 : 0.5} step={h.kind === "count" ? 1 : 0.5} className="sys-input num" value={h.target} aria-label={`${h.label} target`}
                         onChange={(e) => setHabits(habits.map((x, j) => (j === i ? { ...x, target: Math.max(0, Number(e.target.value)) } : x)))} />
                       <span className="sub w-14">{h.unit}</span>
                     </div>
-                    {h.restDays?.length ? <div className="sub col-span-2">REST DAYS: {h.restDays.join(", ")}</div> : null}
+                    {h.restDays?.length ? <div className="sub col-span-2 !normal-case">Rest days: {h.restDays.join(", ")}</div> : null}
                   </div>
                 ))}
               </div>
@@ -78,7 +78,7 @@ export function Onboarding() {
             </Panel>
           )}
           {step === "issued" && (
-            <Panel accent="gold" className="text-center">
+            <Panel accent="gold" className="sys-pop text-center">
               <div className="sys-glyph dia"><span /></div>
               <h1 className="sys-title">[PLAYER REGISTERED]</h1>
               <hr className="sys-rule" />

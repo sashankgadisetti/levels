@@ -4,7 +4,10 @@ import { useNow } from "../../lib/hooks";
 import { handleAction } from "../../store/actions";
 import { useGameState } from "../../store/game";
 import { GoalRow } from "../system/blocks";
+import { usePopups } from "../../store/popups";
+import { useUi } from "../../store/ui";
 import { Empty, Panel } from "../ui/kit";
+import { HowItWorksCard } from "../HowItWorks";
 
 export function DailyQuest() {
   const s = useGameState();
@@ -15,6 +18,8 @@ export function DailyQuest() {
   const cfg = s.config;
   const xp = prog.total * cfg.curves.xpPerGoal + cfg.curves.fullClearBonus;
   const gold = prog.total * cfg.economy.goldPerGoal + cfg.economy.goldFullClear;
+  const helpSeen = useUi((u) => u.helpSeen);
+  const popupsOpen = usePopups((p) => p.queue.length > 0);
   const cleared = q?.result === "clear" || (prog.total > 0 && prog.done === prog.total);
 
   return (
@@ -22,44 +27,45 @@ export function DailyQuest() {
       {s.penalty && !s.penalty.cleared && (
         <Panel accent="red" title="Penalty Quest: Survive">
           <div className="flex items-center justify-between gap-4">
-            <span className="tone-red">The timer does not stop for excuses.</span>
+            <span className="tone-red">Clear a missed goal before the timer ends to survive.</span>
             <PenaltyTimer endsAt={s.penalty.endsAt} />
           </div>
         </Panel>
       )}
       <Panel title="Daily Quest: Preparation to Become Powerful" accent={cleared ? "gold" : undefined}>
         {!q ? (
-          <Empty>No quest issued yet. It will appear at the next day start.</Empty>
+          <Empty>No quest yet. Your next one arrives when the day turns over.</Empty>
         ) : (
           <>
             <div className="mb-3 flex items-end justify-between">
-              <div className="sub">GOAL <span className="mono ml-2 tone-text">{prog.done}/{prog.total} CLEARED</span></div>
-              <div className="text-right"><span className="sub mr-2">TIME REMAINING</span><span className="mono text-[22px]" style={{ color: left < 3600 * 3 ? "var(--sl-red)" : "var(--sl-cyan)" }} data-testid="time-left">{fmtHMS(left)}</span></div>
+              <div className="sub">TODAY <span className="mono ml-2 tone-text">{prog.done}/{prog.total} done</span></div>
+              <div className="text-right"><span className="sub mr-2">Day ends in</span><span className="mono text-[22px]" style={{ color: left < 3600 * 3 ? "var(--sl-red)" : "var(--sl-cyan)" }} data-testid="time-left">{fmtHMS(left)}</span></div>
             </div>
             <div className="grid gap-2">
               {q.goals.map((g) =>
                 g.rest ? (
                   <div key={g.id} className="sys-goal rest done" data-testid={`goal-${g.id}`}>
-                    <div className="n">{g.label}<small>({statShort(cfg, g.stat)}) REST DAY</small></div>
-                    <div className="c mono tone-gold text-[16px]">[REST]</div>
+                    <div className="n">{g.label}<small>{statShort(cfg, g.stat)} · rest day</small></div>
+                    <div className="c mono tone-gold text-[16px]">&#10003; rest</div>
                   </div>
                 ) : (
-                  <GoalRow key={g.id} onAction={handleAction} block={{ type: "goalRow", goalId: g.id, label: g.label, current: g.current, target: g.target, unit: g.unit, stat: statShort(cfg, g.stat), done: g.done }} />
+                  <GoalRow key={g.id} onAction={handleAction} prevNight={cfg.habits.find((h) => h.id === g.habitId)?.logPrevNight} block={{ type: "goalRow", goalId: g.id, label: g.label, current: g.current, target: g.target, unit: g.unit, stat: statShort(cfg, g.stat), done: g.done }} />
                 ),
               )}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-1 text-[18px]">
-              <span className="sub">REWARD</span>
+              <span className="sub">Reward for a full clear</span>
               <span className="mono tone-gold glow-gold">XP +{xp}</span>
               <span className="mono tone-gold glow-gold">GOLD +{gold}</span>
-              <span className="mono tone-gold glow-gold">RANDOM BOX x1</span>
+              <span className="mono tone-gold glow-gold">Random box x1</span>
             </div>
-            <p className="sys-footer !text-left">&#9888; FAILURE TO COMPLETE THE DAILY QUEST WILL RESULT IN A PENALTY.</p>
+            <p className="copy dim mt-3">Clear every goal before the day ends and the rewards arrive immediately. Miss one and a penalty quest starts.</p>
           </>
         )}
       </Panel>
+      {!helpSeen && !popupsOpen && <HowItWorksCard />}
       <Panel title="History">
-        {s.history.length === 0 ? <Empty>No closed days yet.</Empty> : (
+        {s.history.length === 0 ? <Empty>No finished days yet. Each day you close shows up here as a letter grade.</Empty> : (
           <div className="flex flex-wrap gap-2">
             {s.history.slice(-14).map((d) => { const g = gradeOf(d); return (
               <div key={d.date} className="text-center" title={`${d.date}: ${d.result ?? ""}`}>

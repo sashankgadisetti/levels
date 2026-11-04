@@ -8,7 +8,7 @@ export function Shadows() {
   return (
     <div className="mx-auto max-w-[980px]">
       <Panel title="Shadow Army" accent="purple" right={<span className="sub">{s.shadows.length} IN THE ARMY</span>}>
-        {s.shadows.length === 0 ? <Empty>No shadows extracted. Hold a streak to 7 days.</Empty> : (
+        {s.shadows.length === 0 ? <Empty>No shadows yet. Keep a streak going for 7 days to be offered an extraction.</Empty> : (
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))" }}>
             {s.shadows.map((sh) => (
               <div key={sh.id} className="sys-card flex flex-col items-center text-center" style={{ borderColor: "rgba(155,92,255,.5)", background: "radial-gradient(ellipse at 50% 100%, rgba(155,92,255,.3), rgba(155,92,255,.05) 70%)" }}>

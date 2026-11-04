@@ -18,7 +18,7 @@ export function TitlesSkills() {
       </div>
       {tab === "titles" ? (
         <Panel title="Titles" accent="gold">
-          {s.titles.length === 0 ? <Empty>No titles earned.</Empty> : (
+          {s.titles.length === 0 ? <Empty>No titles yet. They unlock as you play.</Empty> : (
             <div className="grid gap-2">
               {s.titles.map((t) => {
                 const eq = s.player.equippedTitleId === t.id;
@@ -35,7 +35,7 @@ export function TitlesSkills() {
       ) : (
         <Panel title="Skills">
           <div className="mb-4"><SBar label="MP" value={s.vitals.mp} max={max.mp} tone="blue" /></div>
-          {s.skills.length === 0 ? <Empty>No skills unlocked.</Empty> : (
+          {s.skills.length === 0 ? <Empty>No skills yet. They unlock as you level up.</Empty> : (
             <div className="grid gap-2">
               {s.skills.map((k) => {
                 const cdLeft = k.lastUsedAt ? (Date.parse(k.lastUsedAt) + k.cooldownHours * 3600_000 - now.getTime()) / 1000 : 0;

@@ -11,6 +11,8 @@ import { uid } from "../lib/format";
 import { isTauri, showSystemWindow } from "../lib/tauri";
 import { parseSpec, type SystemWindowSpec } from "../system/spec";
 import { usePopups } from "./popups";
+import { shapePopups, type Spec } from "./cadence";
+import { remember, stashFolded } from "./snooze";
 
 export interface EffectDeps {
   isTauri: () => boolean;
@@ -46,22 +48,52 @@ export const defaultEffectDeps: EffectDeps = {
   oracle: (e) => oracleHandler?.(e),
 };
 
+/** While onboarding registers the player, the registration / title / first-quest windows come from separate events: gather them. */
+const WELCOME_WINDOW_MS = 150;
+let gathering: { specs: Spec[]; deps: EffectDeps } | undefined;
+
+function present(spec: Spec, deps: EffectDeps) {
+  remember(spec);
+  if (deps.isTauri()) void deps.showSystemWindow(spec);
+  else deps.pushOverlay(spec);
+}
+
+function showShaped(specs: Spec[], deps: EffectDeps) {
+  const shaped = shapePopups(specs, uid);
+  if (shaped.summary) stashFolded(shaped.summary.id, shaped.folded);
+  shaped.show.forEach((sp) => present(sp, deps));
+}
+
 export function routeEffects(effects: Effect[], deps: EffectDeps = defaultEffectDeps): void {
+  const specs: Spec[] = [];
+  for (const e of effects) {
+    if (e.kind !== "popup") continue;
+    const checked = parseSpec(e.spec);
+    if (!checked.success) { console.warn("[levels] invalid popup spec", checked.error); continue; }
+    specs.push({ ...checked.data, id: checked.data.id ?? uid() });
+  }
+  if (gathering && specs.length) {
+    gathering.specs.push(...specs);
+  } else if (specs.some((sp) => sp.title === "PLAYER REGISTERED")) {
+    const g = { specs: [...specs], deps };
+    gathering = g;
+    setTimeout(() => { gathering = undefined; showShaped(g.specs, g.deps); }, WELCOME_WINDOW_MS);
+  } else if (specs.length) {
+    showShaped(specs, deps);
+  }
+  // Sounds a popup already plays are not repeated by the engine's separate sound effect.
   const popupSounds = new Set<string>();
-  for (const e of effects) if (e.kind === "popup" && e.spec.sound !== "none") popupSounds.add(e.spec.sound);
+  for (const sp of specs) if (sp.sound !== "none") popupSounds.add(sp.sound);
   for (const e of effects) {
     switch (e.kind) {
-      case "popup": {
-        const checked = parseSpec(e.spec);
-        if (!checked.success) { console.warn("[levels] invalid popup spec", checked.error); break; }
-        const spec = { ...checked.data, id: checked.data.id ?? uid() };
-        if (deps.isTauri()) void deps.showSystemWindow(spec);
-        else deps.pushOverlay(spec);
-        break;
-      }
       case "notify": void deps.notify(e.title, e.body); break;
       case "sound": if (!popupSounds.has(e.sound)) deps.playSound(e.sound); break;
       case "oracle": deps.oracle(e); break;
     }
   }
+}
+
+/** Re-show specs directly (no reshaping): used by snooze and the "N more" View action. */
+export function presentSpecs(specs: Spec[], deps: EffectDeps = defaultEffectDeps): void {
+  for (const spec of specs) present(spec, deps);
 }

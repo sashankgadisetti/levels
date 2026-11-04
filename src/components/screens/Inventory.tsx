@@ -21,7 +21,7 @@ export function Inventory() {
       </Panel>
       <div className="grid items-start gap-5" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
         <Panel title="Items" right={<span className="sub">{s.inventory.length} HELD</span>}>
-          {s.inventory.length === 0 ? <Empty>Inventory empty. Clear a Daily Quest.</Empty> : (
+          {s.inventory.length === 0 ? <Empty>Nothing here yet. Clear a full Daily Quest to earn a random box.</Empty> : (
             <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))" }}>
               {s.inventory.map((i) => {
                 const c = RARITY[i.rarity];

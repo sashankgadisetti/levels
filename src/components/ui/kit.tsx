@@ -34,6 +34,17 @@ export function SBar({ value, max, tone = "cyan", thin, label, numbers = true }:
   );
 }
 
+/** Compact labelled meter for the header: `HP [bar] 90/100`. */
+export function Meter({ label, value, max, tone = "cyan", title }: { label: string; value: number; max: number; tone?: Tone; title?: string }) {
+  return (
+    <div className="meter" title={title ?? `${label} ${Math.round(value)} / ${Math.round(max)}`}>
+      <span className="lbl">{label}</span>
+      <div className={`sys-bar thin bar-${tone}`}><i style={{ width: `${pct(value, max)}%` }} /></div>
+      <b>{Math.round(value)}/{Math.round(max)}</b>
+    </div>
+  );
+}
+
 export function Chip({ children, tone }: { children: ReactNode; tone?: "gold" | "red" | "purple" }) {
   return <span className={`chip ${tone ?? ""}`}>{children}</span>;
 }
@@ -45,21 +56,21 @@ export function Rank({ rank, size }: { rank: string; size?: "sm" | "lg" }) {
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="grid items-center gap-3 py-1.5" style={{ gridTemplateColumns: "200px 1fr" }}>
-      <span className="tone-dim text-[15px]">{label}{hint && <small className="sub block !text-[11px] normal-case">{hint}</small>}</span>
+      <span className="text-[16px]">{label}{hint && <small className="tone-dim block text-[13px] leading-snug">{hint}</small>}</span>
       <div>{children}</div>
     </label>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="sys-card dis text-center text-[15px]" style={{ borderStyle: "dashed", padding: "24px 14px" }}>[{children}]</div>;
+  return <div className="sys-card text-center text-[16px] leading-normal" style={{ borderStyle: "dashed", padding: "20px 16px", color: "var(--sl-muted)" }}>{children}</div>;
 }
 
 export function Toggle({ on, onChange, label }: { on: boolean; onChange(v: boolean): void; label?: string }) {
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} className="relative h-5 w-11 border"
-      style={{ borderColor: on ? "var(--sl-cyan)" : "var(--sl-locked)", background: on ? "rgba(63,216,255,.18)" : "transparent" }}>
-      <i className="absolute top-0.5 block h-3.5 w-4 transition-all" style={{ left: on ? 24 : 2, background: on ? "var(--sl-cyan)" : "var(--sl-locked)", boxShadow: on ? "0 0 8px var(--sl-cyan)" : "none" }} />
+      style={{ borderColor: on ? "var(--sl-cyan)" : "var(--sl-muted)", background: on ? "rgba(63,216,255,.18)" : "transparent" }}>
+      <i className="absolute top-0.5 block h-3.5 w-4 transition-all" style={{ left: on ? 24 : 2, background: on ? "var(--sl-cyan)" : "var(--sl-muted)", boxShadow: on ? "0 0 8px var(--sl-cyan)" : "none" }} />
     </button>
   );
 }

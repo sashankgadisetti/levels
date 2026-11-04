@@ -10,6 +10,9 @@ const DEFAULT_GLYPH: Record<string, keyof typeof GLYPH | "none"> = {
   shadow: "crown", gate: "diamond", status: "none", shop: "none",
 };
 /** Variants that must be answered: no close button, no Esc, no auto-dismiss. */
+/** Focus the primary button without scrolling the window (long windows would jump to the bottom). */
+const focusNoScroll = (el: HTMLButtonElement | null) => { el?.focus({ preventScroll: true }); };
+const RING = 2 * Math.PI * 9;
 const STICKY = new Set(["penalty"]);
 
 interface Props {
@@ -18,9 +21,11 @@ interface Props {
   onDismiss(): void;
   /** Layout hint: the pop-up window fills its webview; overlay layers use a fixed width. */
   width?: number | string;
+  /** Cap for the window's own height (the Tauri pop-up passes its max); content scrolls beyond it. */
+  maxHeight?: number | string;
 }
 
-export function SystemWindow({ spec, onAction, onDismiss, width = 520 }: Props) {
+export function SystemWindow({ spec, onAction, onDismiss, width = 520, maxHeight = "100%" }: Props) {
   const reduced = useReducedMotion();
   const [hover, setHover] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -72,6 +77,7 @@ export function SystemWindow({ spec, onAction, onDismiss, width = 520 }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeout, hover, dismiss]);
 
+  const canSnooze = !sticky && (spec.variant === "quest" || spec.variant === "warning") && !spec.actions.some((a) => a.kind === "dismiss" && /^later$/i.test(a.label.trim()));
   const glyphKey = spec.glyph ?? DEFAULT_GLYPH[spec.variant] ?? "none";
   const glyphChar = glyphKey === "none" ? null : GLYPH[glyphKey];
 
@@ -90,12 +96,12 @@ export function SystemWindow({ spec, onAction, onDismiss, width = 520 }: Props) 
 
   return (
     <motion.div
-      className="sys"
+      className="sys sys-pop"
       data-variant={spec.variant}
       role={sticky ? "alertdialog" : "status"}
       aria-live={sticky ? "assertive" : "polite"}
       aria-label={spec.title}
-      style={{ width, maxWidth: "100%", maxHeight: "100%", overflow: "auto", transformOrigin: "center" }}
+      style={{ width, maxWidth: "100%", maxHeight, overflow: "auto", transformOrigin: "center" }}
       {...enter}
       exit={{ opacity: 0, scale: reduced ? 1 : 0.97, filter: reduced ? "none" : "brightness(2)", transition: { duration: reduced ? 0.08 : 0.3, ease: "easeIn" } }}
       onMouseEnter={() => setHover(true)}
@@ -104,6 +110,12 @@ export function SystemWindow({ spec, onAction, onDismiss, width = 520 }: Props) 
       <div className="sys-scanlines" />
       <div className="scan-line" />
       {spec.generated && <span className="sys-oracle">ORACLE</span>}
+      {!sticky && timeout > 0 && (
+        <svg className="ring absolute right-[38px] top-[11px]" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+          <circle className="track" cx="11" cy="11" r="9" />
+          <circle className="prog" cx="11" cy="11" r="9" strokeDasharray={RING} strokeDashoffset={RING * Math.min(1, elapsed / timeout)} style={{ opacity: hover ? 0.5 : 1 }} />
+        </svg>
+      )}
       {!sticky && (
         <button className="sys-close" aria-label="Dismiss" onClick={dismiss}>&times;</button>
       )}
@@ -121,10 +133,15 @@ export function SystemWindow({ spec, onAction, onDismiss, width = 520 }: Props) 
       {spec.actions.length > 0 && (
         <div className="sys-actions">
           {spec.actions.map((a, i) => (
-            <button key={i} className={`sys-btn ${a === primary ? "primary" : ""}`} onClick={() => fire(a)} autoFocus={a === primary}>
+            <button key={i} className={`sys-btn ${a === primary ? "primary" : ""}`} onClick={() => fire(a)} ref={a === primary ? focusNoScroll : undefined}>
               [{a.label.toUpperCase()}]
             </button>
           ))}
+        </div>
+      )}
+      {canSnooze && (
+        <div className="text-center">
+          <button className="snooze" onClick={() => fire({ label: "Later", kind: "dismiss", arg: "snooze" })}>Remind me in 30 min</button>
         </div>
       )}
       {spec.footer && <p className="sys-footer">&#9888; {spec.footer}</p>}

@@ -21,7 +21,7 @@ export function startScheduler(tickMs = 60_000): () => void {
 /** Main window: actions from the System pop-up window + tray navigation events. */
 export function startBridges(): () => void {
   const subs = [
-    listen<SystemActionEvent>(SYSTEM_ACTION_EVENT, (p) => p?.action && handleAction(p.action)),
+    listen<SystemActionEvent>(SYSTEM_ACTION_EVENT, (p) => p?.action && handleAction(p.action, { windowId: p.windowId })),
     listen(EVENTS.openStatus, () => useUi.getState().setScreen("status")),
     listen(EVENTS.toggleStatus, () => useUi.getState().setScreen("status")),
     listen(EVENTS.showDailyQuest, () => useUi.getState().setScreen("daily")),
