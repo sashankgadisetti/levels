@@ -53,8 +53,24 @@ const defaultDeps = (): GameDeps => ({
   baseConfig: engine.DEFAULT_CONFIG,
   persistence: createPersistence,
   runEffects: (e) => routeEffects(e),
-  now: () => new Date(),
+  now: () => new Date(Date.now() + devTimeOffsetMs()),
 });
+
+/**
+ * Dev/test aid: `localStorage["levels:devTimeOffsetMs"]` (or `window.__levelsTimeOffsetMs`) shifts the
+ * app clock so day boundaries and penalties can be exercised without waiting. Ignored when unset.
+ */
+/** The app clock (honours the dev offset). UI countdowns must use this, not Date.now(). */
+export const nowMs = () => Date.now() + devTimeOffsetMs();
+
+export function devTimeOffsetMs(): number {
+  try {
+    const w = globalThis as unknown as { __levelsTimeOffsetMs?: number; localStorage?: Storage };
+    if (typeof w.__levelsTimeOffsetMs === "number") return w.__levelsTimeOffsetMs;
+    const v = w.localStorage?.getItem("levels:devTimeOffsetMs");
+    return v ? Number(v) || 0 : 0;
+  } catch { return 0; }
+}
 
 export function createGameStore(overrides: Partial<GameDeps> = {}): StoreApi<GameStore> {
   const deps: GameDeps = { ...defaultDeps(), ...overrides };

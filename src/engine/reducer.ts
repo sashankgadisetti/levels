@@ -118,32 +118,13 @@ function closeDay(c: Ctx, date: YMD): void {
   const cleared = missed.length === (tenacity ? 1 : 0);
   const result: "clear" | "partial" | "fail" = cleared ? "clear" : doneN <= Math.floor(n / 4) || prev === "partial" || prev === "fail" ? "fail" : "partial";
 
-  // --- rewards for done goals ---
-  const boost = s.xpBoostFor === date ? 0.5 : 0;
-  let xp = 0, gold = 0, hpLost = 0;
-  const statXp: Partial<Record<StatId, number>> = {};
-  for (const g of q.goals) {
-    if (!g.done) continue;
-    const h = habitOf(cfg, g);
-    const diff = h && h.kind !== "check" && h.target > 0 ? Math.max(1, g.target / h.target) : 1;
-    const mult = Math.min(3, Math.min(3, 1 + titleXpBonus(s, g.stat) + boost) * (g.xpMult ?? 1));
-    const gx = Math.round(cfg.curves.xpPerGoal * diff * (g.rest ? 0.5 : 1) * mult);
-    xp += gx; statXp[g.stat] = (statXp[g.stat] ?? 0) + gx;
-    gold += goalGold(s, !!g.rest);
-    const v = goalVitals(g.stat);
-    addHp(s, v.hp); addMp(s, v.mp);
-  }
-  let points = 0;
-  if (cleared) {
-    xp += Math.round(cfg.curves.fullClearBonus * Math.min(3, 1 + titleXpBonus(s, "ALL") + boost));
-    gold += cfg.economy.goldFullClear;
-    s.boxes += 1; points = 1; s.player.abilityPoints += 1;
-  }
-  gold = Math.round(gold * (1 + titleGoldBonus(s)));
-  for (const sh of s.shadows) gold += shadowGold(sh);
-  s.gold += gold;
-  for (const id of Object.keys(statXp) as StatId[]) { s.stats[id].xp += statXp[id]!; recalcStat(s, id); }
-  const lvl = awardXp(c, xp);
+  // --- rewards (already paid if the quest was fully cleared earlier) ---
+  let hpLost = 0;
+  const rewarded = !!q.rewardedAt;
+  const pay = rewarded ? { xp: q.xpEarned ?? 0, gold: q.goldEarned ?? 0, points: 0, lvl: undefined as LevelInfo | undefined } : payGoals(c, q, cleared);
+  let gold = pay.gold;
+  for (const sh of s.shadows) { gold += shadowGold(sh); s.gold += shadowGold(sh); }
+  const { xp, points, lvl } = pay;
 
   // --- vitals ---
   for (const g of missed) if (g !== forgiven) { const l = missedHpLoss(g.stat); hpLost += l; addHp(s, -l); }
@@ -178,11 +159,51 @@ function closeDay(c: Ctx, date: YMD): void {
   finishDay(s, q);
 
   // --- ceremony, in order: result -> penalty -> level up(s) -> rank -> title/skill -> shadow offer ---
-  popup(c, W.questComplete(q, { xp, gold, box: cleared, points, overallStreak: overall, shielded: so.shielded, broken: so.broken, tenacity, hpLost }));
+  if (!rewarded) popup(c, W.questComplete(q, { xp, gold, box: cleared, points, overallStreak: overall, shielded: so.shielded, broken: so.broken, tenacity, hpLost }));
   if (result === "fail") startPenalty(c, q, missed);
   announceLevel(c, lvl);
   checkUnlocks(c);
   for (const o of so.offers) popup(c, W.shadowOffer(o.stat, o.milestone));
+}
+
+/** Pay goal XP/gold/vitals (+ full-clear bonus, box, point when `cleared`) and apply level-ups. Shadow gold is paid at close. */
+function payGoals(c: Ctx, q: NonNullable<State["today"]>, cleared: boolean) {
+  const s = c.s, cfg = s.config, date = q.date;
+  const boost = s.xpBoostFor === date ? 0.5 : 0;
+  let xp = 0, gold = 0, points = 0;
+  const statXp: Partial<Record<StatId, number>> = {};
+  for (const g of q.goals) {
+    if (!g.done) continue;
+    const h = habitOf(cfg, g);
+    const diff = h && h.kind !== "check" && h.target > 0 ? Math.max(1, g.target / h.target) : 1;
+    const mult = Math.min(3, Math.min(3, 1 + titleXpBonus(s, g.stat) + boost) * (g.xpMult ?? 1));
+    const gx = Math.round(cfg.curves.xpPerGoal * diff * (g.rest ? 0.5 : 1) * mult);
+    xp += gx; statXp[g.stat] = (statXp[g.stat] ?? 0) + gx;
+    gold += goalGold(s, !!g.rest);
+    const v = goalVitals(g.stat);
+    addHp(s, v.hp); addMp(s, v.mp);
+  }
+  if (cleared) {
+    xp += Math.round(cfg.curves.fullClearBonus * Math.min(3, 1 + titleXpBonus(s, "ALL") + boost));
+    gold += cfg.economy.goldFullClear;
+    s.boxes += 1; points = 1; s.player.abilityPoints += 1;
+  }
+  gold = Math.round(gold * (1 + titleGoldBonus(s)));
+  s.gold += gold;
+  for (const id of Object.keys(statXp) as StatId[]) { s.stats[id].xp += statXp[id]!; recalcStat(s, id); }
+  const lvl = awardXp(c, xp);
+  return { xp, gold, points, lvl };
+}
+
+/** Immediate full-clear reward, fired by the goal event that completes the quest. */
+function rewardClear(c: Ctx, q: NonNullable<State["today"]>): void {
+  const s = c.s;
+  const pay = payGoals(c, q, true);
+  q.rewardedAt = c.at; q.result = "clear"; q.xpEarned = pay.xp; q.goldEarned = pay.gold;
+  s.sprintArmed = false;
+  popup(c, W.questComplete(q, { xp: pay.xp, gold: pay.gold, box: true, points: pay.points, overallStreak: count(s, "overall") + 1, shielded: [], broken: [], tenacity: false, hpLost: 0 }));
+  announceLevel(c, pay.lvl);
+  checkUnlocks(c);
 }
 
 function finishDay(s: State, q: NonNullable<State["today"]>): void {
@@ -195,9 +216,11 @@ function touchGoal(c: Ctx, goalId: string, fn: (v: number) => number): void {
   const s = c.s, g = s.today?.goals.find((x) => x.id === goalId);
   if (!g) return;
   const was = g.done;
-  setGoalValue(g, fn(g.current));
+  setGoalValue(g, s.today!.rewardedAt ? Math.max(g.target, fn(g.current)) : fn(g.current));
   if (!was && g.done && !g.rest && s.sprintArmed) { g.xpMult = 2; s.sprintArmed = false; }
   else if (was && !g.done && g.xpMult) { delete g.xpMult; s.sprintArmed = true; }
+  const q = s.today!;
+  if (!q.rewardedAt && isFullClear(q)) rewardClear(c, q);
 }
 
 function tick(c: Ctx): void {

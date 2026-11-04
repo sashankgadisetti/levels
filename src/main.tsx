@@ -16,7 +16,10 @@ export function App() {
   return <MainShell />;
 }
 
-createRoot(document.getElementById("root")!).render(
+// Keep one React root across Vite HMR re-executions of this module (otherwise the app remounts and loses UI state).
+const g = globalThis as unknown as { __levelsRoot?: ReturnType<typeof createRoot> };
+const root = g.__levelsRoot ?? (g.__levelsRoot = createRoot(document.getElementById("root")!));
+root.render(
   <StrictMode>
     <App />
   </StrictMode>,

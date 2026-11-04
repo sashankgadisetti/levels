@@ -42,6 +42,45 @@ describe("quests", () => {
   });
 });
 
+describe("immediate full-clear reward", () => {
+  it("pays on the completing event, not again at close, and clamps afterwards", () => {
+    let r = started(undefined, (s) => { s.player.level = 10; });
+    const goals = r.s.today!.goals;
+    r = feed(r, ...goals.slice(0, 3).map((g) => ({ type: "GOAL_SET" as const, goalId: g.id, value: g.target, at: T(MON, "12:00") })));
+    expect(r.s.boxes).toBe(0);
+    expect(r.s.today!.rewardedAt).toBeUndefined();
+    const n = r.fx.length;
+    r = feed(r, { type: "GOAL_SET", goalId: goals[3].id, value: goals[3].target, at: T(MON, "13:00") });
+    expect(r.s.today).toMatchObject({ rewardedAt: T(MON, "13:00"), result: "clear", xpEarned: 240, goldEarned: 90 });
+    expect(r.s.boxes).toBe(1);
+    expect(r.s.gold).toBe(90);
+    expect(r.s.player).toMatchObject({ xp: 240, abilityPoints: 1 });
+    expect(popups(r.fx.slice(n)).map((p) => p.title)[0]).toBe("DAILY QUEST COMPLETE");
+    // no clawback / un-clearing
+    r = feed(r, { type: "GOAL_SET", goalId: goals[3].id, value: 0, at: T(MON, "13:05") }, { type: "GOAL_PROGRESS", goalId: goals[0].id, delta: -5, at: T(MON, "13:06") });
+    expect(r.s.today!.goals.every((g) => g.done && g.current === g.target)).toBe(true);
+    expect(r.s.gold).toBe(90);
+    const m = r.fx.length;
+    r = nextDay(r);
+    expect(r.s.gold).toBe(90);
+    expect(r.s.boxes).toBe(1);
+    expect(r.s.player).toMatchObject({ xp: 240, abilityPoints: 1 });
+    expect(lastResult(r.s)).toMatchObject({ result: "clear", xpEarned: 240, goldEarned: 90 });
+    expect(r.s.streaks.STR.current).toBe(1);
+    expect(titles(r.fx.slice(m))).not.toContain("DAILY QUEST COMPLETE");
+  });
+  it("level-up popups follow the result popup immediately; shadow gold still paid at close", () => {
+    let r = started(undefined, (s) => { s.shadows.push({ id: "x", name: "x", stat: "STR", rank: "Normal Soldier", extractedAt: "", streakAtExtraction: 1 }); });
+    const n = r.fx.length;
+    r = complete(r, "all", T(MON, "12:00"));
+    const t = titles(r.fx.slice(n));
+    expect(t.indexOf("DAILY QUEST COMPLETE")).toBeLessThan(t.indexOf("LEVEL UP"));
+    const gold = r.s.gold;
+    r = nextDay(r);
+    expect(r.s.gold - gold).toBe(2);
+  });
+});
+
 describe("day close", () => {
   it("clear: bonus, box, point, level-up ceremony order", () => {
     let r = complete(started(), "all", T(MON, "12:00"));

@@ -36,7 +36,7 @@ export interface Config {
 }
 
 export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */ }
-export interface DailyQuest { date: YMD; goals: Goal[]; startedAt: ISO; closedAt?: ISO; result?: "clear" | "partial" | "fail"; xpEarned?: number; goldEarned?: number }
+export interface DailyQuest { date: YMD; goals: Goal[]; startedAt: ISO; closedAt?: ISO; rewardedAt?: ISO /* full-clear rewards paid at this time */; result?: "clear" | "partial" | "fail"; xpEarned?: number; goldEarned?: number }
 
 export interface Item { id: string; defId: string; name: string; rarity: Rarity; description: string; consumable: boolean; obtainedAt: ISO }
 export interface RewardDef { id: string; name: string; usd: number; url?: string; stat?: StatId; note?: string; createdAt: ISO; purchasedAt?: ISO; goldPaid?: number }
