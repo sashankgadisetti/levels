@@ -49,5 +49,5 @@ export const availableSkills = (s: State, now: ISO): Skill[] => s.skills.filter(
 export const titleCatalog = () => TITLE_DEFS.map(({ id, name, condition, effect }) => ({ id, name, condition, effect }));
 export const nextRank = (s: State): { rank: HunterRank; level: number } | undefined => nextRankAt(s.player.level);
 export const pendingExtractions = (s: State) => s.pendingExtractions ?? [];
-export const isQuiet = (s: State, now: ISO) => !!s.quietUntil && now < s.quietUntil;
+export const stealthActive = (s: State, now: ISO) => !!s.quietUntil && now < s.quietUntil;
 export const canBuy = (s: State, reward: RewardDef) => canPurchase(reward, s);

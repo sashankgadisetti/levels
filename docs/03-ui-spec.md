@@ -349,28 +349,46 @@ Clear: `[ GATE CLEARED ]  Rank C Gate eliminated. REWARD...` (reward variant). R
 
 ## 5. Block types (renderer contract)
 
-Each block: `{ "type": "...", ...props }`. Unknown types are rejected. All string props are length-limited (title 48, text 220). Colours are tone names (`cyan|red|gold|purple|dim`), never raw CSS.
+The single source of truth is `src/system/spec.ts` (`SystemWindowSpec`, zod). Hand-written windows (engine effects) and Oracle-generated windows both produce it; `parseSpec()` validates every spec before rendering and rejects anything outside the closed sets below. The renderer is `src/components/system/SystemWindow.tsx`; one component per block in `src/components/system/blocks/`, mapped by the registry in `blocks/index.ts` (`type -> component`; an unknown type renders nothing).
+
+**Window fields (`SystemWindowSpec`)**
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `string?` (max 64) | Stable id; echoed back in `SystemActionEvent.windowId`. Generated when absent. |
+| `variant` | `info \| quest \| warning \| reward \| levelup \| penalty \| status \| shop \| shadow \| gate` | Accent: info/quest/status/shop = cyan; warning/penalty = red; reward/levelup = gold; shadow = purple; gate = cyan border + gold title/glyph. `penalty` is sticky (no close button, no Esc, no auto-dismiss). |
+| `title` | `string` (1-80) | Rendered as `[ UPPERCASE ]` by the renderer (Orbitron). |
+| `glyph` | `alert \| diamond \| skull \| crown \| box \| none` (optional) | Defaults by variant (alert for warning/penalty/quest/info, diamond for reward/levelup/gate, crown for shadow, none for status/shop). |
+| `blocks` | `Block[]` (max 14) | See below. |
+| `actions` | `Action[]` (max 3, default `[]`) | Buttons, centred under the body. |
+| `footer` | `string?` (max 160) | Red warning line with a leading warning sign. |
+| `sound` | `ding \| levelup \| arise \| alarm \| none` (default `ding`) | Synthesised with Web Audio (`sound.ts`, no files); respects the `muted` setting. |
+| `timeoutMs` | `int 0..600000?` | Auto-dismiss with a 2 px countdown line; pauses on hover. Omitted/0 = stays. |
+| `generated` | `boolean?` | True when Claude wrote it; the renderer shows a tiny `ORACLE` mark. |
+
+Colours are tone names (`cyan | red | gold | purple | dim`), never raw CSS.
+
+**Blocks (`type` discriminates)**
 
 | Type | Props | Renders as |
 |---|---|---|
-| `text` | `text: string`, `tone?: "normal"\|"dim"\|"warn"\|"reward"\|"shadow"`, `align?: "left"\|"center"`, `size?: "sm"\|"md"\|"lg"` | A paragraph. `warn` adds the leading `!` and red colour. |
-| `goalRow` | `goalId: string`, `label: string`, `stat: "STR"\|"INT"\|"SENSE"\|"VIT"\|"AGI"`, `progress: number`, `target: number`, `unit?: string`, `done: boolean`, `quickLog?: number[]` | Checkbox + stat tag + label + `progress / target UNIT` + `[+N]` quick buttons (emit `log_goal`). Binary goals: `target: 1`. |
-| `statRow` | `stat`, `value: number`, `bonus?: number`, `canAllocate?: boolean`, `spark?: number[]` | Stat name, value `10 (+2)`, optional `[+]`, optional 30-pt sparkline. |
-| `bar` | `label: string`, `value: number`, `max: number`, `tone?: "cyan"\|"red"\|"gold"\|"purple"`, `showNumbers?: boolean` | Labelled progress bar (HP/MP/Fatigue/XP). Animated fill. |
-| `kv` | `items: { k: string, v: string, tone?: string }[]`, `columns?: 1\|2\|3` | Key-value grid. Values in Share Tech Mono. |
-| `timer` | `endsAt: string (ISO)`, `label?: string`, `format?: "hms"\|"ms"`, `tone?: "cyan"\|"red"`, `onZero?: "dismiss"\|"event:<id>"` | Big mono countdown; ticks each second; emits event at zero (allow-listed ids). |
-| `list` | `items: string[]`, `ordered?: boolean`, `bullet?: "dash"\|"diamond"`, `tone?` | Simple list (max 10 items). |
-| `divider` | `label?: string` | Accent rule with optional centred bracketed label. |
-| `itemCard` | `itemId: string`, `name: string`, `rarity: "common"\|"rare"\|"epic"\|"legendary"`, `qty?: number`, `desc?: string`, `iconKey?: string` | Item tile with rarity border, icon from the bundled set, quantity badge. |
-| `shadowSilhouette` | `name: string`, `rank: "SOLDIER"\|"ELITE"\|"KNIGHT"\|"COMMANDER"\|"MARSHAL"\|"GRAND_MARSHAL"`, `variant?: 0..7`, `eyes?: "purple"\|"cyan"`, `animate?: boolean` | One of 8 bundled SVG silhouettes with glowing eyes; rank sets size/ornament. `animate` plays the Arise fade. |
+| `text` | `text` (max 400), `tone?`, `align?: left \| center` (default center) | A paragraph. |
+| `goalRow` | `goalId`, `label` (48), `current`, `target`, `unit` (12), `stat?` (8), `done?` | Goal card: label + `(STAT) target unit`, `[current/target]`, progress bar, quick-log buttons `+1`, `+N` (15 for minute goals, 5 for targets >= 8) and a tick. Click the number to type a value. Emits `progress:goal` (`arg = "goalId:delta"`) or `complete:goal` (`arg = goalId`). In-block actions do not close the window. |
+| `statRow` | `stat` (16), `value`, `delta?`, `max?`, `locked?` | Stat name, bar, value, optional gold `+delta`; `locked` greys it out. |
+| `bar` | `label` (24), `value`, `max`, `tone?` | Labelled animated bar with `value / max`. |
+| `kv` | `rows: [key (32), value (64)][]` (max 12) | Key/value grid; values in Share Tech Mono. |
+| `timer` | `endsAt` (ISO), `label?` (40), `tone?` | Big mono `HH:MM:SS` countdown, ticks every second. |
+| `list` | `items: string[]` (max 10, 140 each), `tone?` | Diamond-bullet list. |
+| `divider` | none | Accent rule. |
+| `itemCard` | `name` (48), `rarity: common \| rare \| epic \| legendary`, `description` (200), `goldPrice?`, `usdPrice?`, `affordable?` | Rarity-bordered tile with prices; `affordable: false` dims and shows `INSUFFICIENT`. |
+| `shadow` | `name` (32), `rank` (24), `epithet?` (80) | Purple silhouette with glowing eyes, name and rank. |
+| `rankBadge` | `rank` (16), `previous?` (16) | Diamond rank badge; with `previous`, old (dim) arrow new (gold). |
 
-**Action object:** `{ id: string, label: string, kind?: "primary"\|"secondary"\|"danger", payload?: object }`. `id` must be in the allow-list: `dismiss`, `accept_quest`, `snooze`, `open_screen`, `log_goal`, `open_box`, `allocate`, `equip_title`, `use_item`, `arise`, `accept_rank`, `begin_penalty`, `enter_gate`, `reroll`. `open_screen` payload is `screen` in the screen inventory enum.
+**Actions.** `{ label (1-24), kind, arg? (max 64), primary? }`. `kind` is the closed set: `dismiss`, `accept`, `decline`, `open:status`, `open:quest`, `open:shop`, `open:shadows`, `open:inventory`, `complete:goal`, `progress:goal`, `allocate:points`, `start:dungeon`, `open:box`, `use:item`, `extract:shadow`. Pressing a button emits `SystemActionEvent = { windowId?, action }` and then closes the window (except `progress:goal` / `complete:goal`). Keyboard: Enter triggers the primary action (or the only action), Esc dismisses (not on `penalty`).
 
-**Window-level fields:** `variant: "system"|"warning"|"penalty"|"reward"|"shadow"|"urgent"`, `title: string`, `size?: "compact"|"standard"|"wide"|"full"`, `modal?: boolean`, `autoDismissMs?: number`, `sound: "ding"|"levelup"|"arise"|"alarm"|"none"`, `blocks[]`, `actions[]`, `footerWarning?: string`.
+**Action routing (`src/store/actions.ts`).** `open:*` navigate the main window; `progress:goal` -> `GOAL_PROGRESS` (negative delta -> `GOAL_SET`); `complete:goal` -> `GOAL_PROGRESS` for the remainder; `allocate:points` (`arg` = stat id) -> `POINTS_ALLOCATED`; `open:box` -> `BOX_OPENED` (random seed); `use:item` (`arg` = item id) -> `ITEM_USED`; `extract:shadow` (`arg` = `STAT[:name]`) -> `SHADOW_EXTRACTED`; `start:dungeon` -> opens the Daily Quest screen; `dismiss | accept | decline` do nothing.
 
-**Registry rules:** one React component per block type in `src/ui/blocks/`; the registry maps `type -> component` and a fallback `UnknownBlock` (renders nothing in release, dev-only red box). Blocks are pure functions of props; interaction goes through `actions` or the named events. Max 14 blocks per window.
-
----
+**Transport.** In Tauri the engine's `popup` effect calls the Rust command `show_system_window`, which emits `levels://system-window` to the transparent `system` window (`SystemPopup`). That window validates with `parseSpec`, queues specs and shows them one at a time, emits `levels://system-action` back to the main window, and calls `hide_system_window` when the queue empties. In a plain browser the main window renders the same specs itself in an overlay layer (`PopupLayer`, top-right).
 
 ## 6. Accessibility and platform notes
 

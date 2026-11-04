@@ -122,7 +122,7 @@ export const DEFAULT_CONFIG: Config = {
     { id: "sleep", stat: "SENSE", label: "Sleep",              kind: "hours",    target: 7,  unit: "h", logPrevNight: true },
     { id: "eat",   stat: "VIT",   label: "Clean meals",        kind: "count",    target: 3,  unit: "meals" },
   ],
-  curves: { xpPerGoal: 30, fullClearBonus: 120, levelExponent: 1.5, levelBase: 100, pointsPerLevel: 3 },
+  curves: { xpPerGoal: 30, fullClearBonus: 120, levelExponent: 1.3, levelBase: 30, pointsPerLevel: 3 },
   economy: { goldPerGoal: 10, goldFullClear: 50, goldGate: 300, monthlyBudgetUsd: 150, usdToGold: 20 },
   penalty: { surviveHours: 4, hpLoss: 20, lockShop: true, resetStreakOf: "missedStatsOnly" },
   oracle: { enabled: false, model: "claude-opus-5-5", flavorModel: "claude-haiku-5-5", dailyBudgetUsd: 0.25 },
@@ -135,7 +135,7 @@ Player levels up, `target` for numeric habits can grow by the habit's
 
 ## 5. Numbers
 
-- **Player XP to reach level L+1:** `round(levelBase · L^levelExponent)` → 100, 283, 520, 800, 1118, … (Lv 40 ≈ 25 300 XP, which is roughly 7–8 months of near-perfect days: Job Change lands where it should).
+- **Player XP to reach level L+1:** `round(levelBase · L^levelExponent)` → 30, 74, 125, 182, 243, … Cumulative XP to reach Lv 40 ≈ 61 000, i.e. about 8–9 months of near-perfect days at 240 XP/day, so the Job Change lands where it should; Lv 100 is a multi-year goal.
 - **XP sources:** each goal `xpPerGoal × difficulty` (difficulty 1.0 for a base target, scales with how far above base the target is); full clear `fullClearBonus`; Instant Dungeon `rank × 40`; Gate `400`.
 - **Stat value:** `10 + floor(statXp / 100) + allocatedPoints`. Stat XP = the XP of goals mapped to that stat. So the four areas visibly diverge based on what you actually do.
 - **HP (0–100):** starts 100; `+10` per VIT/SENSE goal (cap 100); `−20` for a penalty; `−5` per missed VIT/SENSE goal at day close. Below 30 the status window shows it red and the Oracle gets "low HP" context.

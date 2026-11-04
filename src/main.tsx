@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import "./styles/globals.css";
 import { MainShell } from "./components/MainShell";
 import { SystemPopup } from "./components/SystemPopup";
+import { bootstrapStore } from "./store/bootstrap";
+
+bootstrapStore();
 
 // Tiny pathname router. Works for dev ("/system") and the built multi-page app ("/system.html").
 export function App() {

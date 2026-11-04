@@ -14,7 +14,7 @@ export const DEFAULT_CONFIG: Config = {
     { id: "sleep", stat: "SENSE", label: "Sleep", kind: "hours", target: 7, unit: "h", logPrevNight: true },
     { id: "eat", stat: "VIT", label: "Clean meals", kind: "count", target: 3, unit: "meals" },
   ],
-  curves: { xpPerGoal: 30, fullClearBonus: 120, levelExponent: 1.5, levelBase: 100, pointsPerLevel: 3 },
+  curves: { xpPerGoal: 30, fullClearBonus: 120, levelExponent: 1.3, levelBase: 30, pointsPerLevel: 3 },
   economy: { goldPerGoal: 10, goldFullClear: 50, goldGate: 300, monthlyBudgetUsd: 150, usdToGold: 20 },
   penalty: { surviveHours: 4, hpLoss: 20, lockShop: true, resetStreakOf: "missedStatsOnly" },
   popups: { warnHoursBefore: [3, 1] },

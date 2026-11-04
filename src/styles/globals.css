@@ -26,7 +26,7 @@
   --sl-text: #d8f6ff;
   --sl-muted: #6f8fa3;
   --sl-locked: #3b4b57;
-  --sl-panel: rgba(8, 20, 40, 0.85);
+  --sl-panel: rgba(8, 20, 40, 0.93);
   --font-head: "Orbitron", "Eurostile", sans-serif;
   --font-body: "Rajdhani", "Segoe UI", sans-serif;
   --font-mono: "Share Tech Mono", ui-monospace, monospace;
@@ -34,6 +34,7 @@
   --accent2: var(--sl-cyan);
 }
 
+@layer base {
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body {
@@ -54,6 +55,9 @@ html.system-page, body.system-page { background: transparent !important; overflo
 /* thin accent scrollbars */
 * { scrollbar-width: thin; scrollbar-color: rgba(63, 216, 255, 0.5) transparent; }
 
+}
+
+@layer components {
 /* ---------- variants ---------- */
 [data-variant="warning"], [data-variant="penalty"], .tone-red-scope { --accent: var(--sl-red); --accent2: var(--sl-red); }
 [data-variant="reward"], [data-variant="levelup"] { --accent: var(--sl-gold); --accent2: var(--sl-gold); }
@@ -221,3 +225,4 @@ select.sys-input option { background: #081428; }
 .nav-btn { text-align: left; padding: 9px 12px; letter-spacing: 0.14em; border-left: 2px solid transparent; color: var(--sl-muted); font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
 .nav-btn:hover { color: var(--sl-cyan); background: rgba(63, 216, 255, 0.05); }
 .nav-btn.on { color: var(--sl-cyan); border-left-color: var(--sl-cyan); background: rgba(63, 216, 255, 0.1); text-shadow: 0 0 8px var(--sl-cyan); }
+}
