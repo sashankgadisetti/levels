@@ -6,7 +6,7 @@ import { getAutostart, getOracleApiKey, setAutostart, setOracleApiKey, useSettin
 import { useUi } from "../../store/ui";
 import { Btn, Field, Panel, SBar, Toggle } from "../ui/kit";
 import { playSound } from "../system/sound";
-import { askTheSystem, oracleSpentTodayUsd } from "../../oracle/wire";
+import { askTheSystem, lastOracleError, oracleSpentTodayUsd, regenerateToday, testOracle } from "../../oracle/wire";
 
 const DAYS: Weekday[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TABS = [["general", "General"], ["goals", "Goals"], ["popups", "Pop-ups"], ["oracle", "Oracle"], ["data", "Data"]] as const;
@@ -68,11 +68,27 @@ export function Settings() {
   }), [cfg, name, dayEnds, habits, warn, quiet, oracle]);
   const dirty = JSON.stringify({ p: patch.player, h: patch.habits, po: patch.popups, o: patch.oracle }) !== JSON.stringify({ p: cfg.player, h: cfg.habits, po: { ...cfg.popups, warnHoursBefore: [...cfg.popups.warnHoursBefore].sort((a, b) => b - a) }, o: cfg.oracle });
 
+  const [testResult, setTestResult] = useState<{ ok: boolean; detail: string } | undefined>();
+  const [testing, setTesting] = useState(false);
+  const runTest = async () => {
+    setTesting(true); setTestResult(undefined);
+    try { await setOracleApiKey(apiKey); setTestResult(await testOracle()); } finally { setTesting(false); }
+  };
+  const generateNow = async () => {
+    setTesting(true); setAskError(undefined);
+    try {
+      const spec = await regenerateToday();
+      if (spec) toast("The System has rewritten today's quest");
+      else setAskError(`${friendlyOracleError(lastOracleError(), !!apiKey, cfg.oracle.enabled)} (${lastOracleError() ?? "no details"})`);
+    } finally { setTesting(false); }
+  };
   const save = () => {
     void setOracleApiKey(apiKey);
     if (invalid) { setShowErrors(true); setTab("goals"); toast("Fix the highlighted goals first"); return; }
+    const turningOn = patch.oracle?.enabled && !cfg.oracle.enabled;
     dispatch({ type: "CONFIG_CHANGED", patch });
     toast("Settings saved");
+    if (turningOn && apiKey) setTimeout(() => { void regenerateToday(); }, 300);
   };
 
   /** Ask the System, capturing the Oracle's own log line so a failure can be explained in plain words. */
@@ -85,7 +101,7 @@ export function Settings() {
     try {
       const spec = await askTheSystem(question.trim());
       if (spec) toast("The System has answered");
-      else setAskError(friendlyOracleError(logged[0], !!apiKey, oracle.enabled));
+      else setAskError(`${friendlyOracleError(logged[0] ?? lastOracleError(), !!apiKey, oracle.enabled)} (${lastOracleError() ?? "no details"})`);
     } catch (e) {
       setAskError(friendlyOracleError(String((e as Error).message ?? e), !!apiKey, oracle.enabled));
     } finally { console.warn = orig; setAsking(false); }
@@ -242,6 +258,11 @@ export function Settings() {
               <span className="mono tone-gold">${spent.toFixed(3)} / ${oracle.dailyBudgetUsd.toFixed(2)}</span>
             </div></Field>
             {!apiKey && <p className="copy dim mt-1">Add an API key above to turn generation on.</p>}
+            <Field label="Connection" hint="Sends a tiny test request."><div className="flex flex-wrap items-center gap-2">
+              <Btn disabled={testing || !apiKey} onClick={() => void runTest()}>{testing ? "[…]" : "[TEST CONNECTION]"}</Btn>
+              <Btn disabled={testing || !apiKey || !cfg.oracle.enabled} onClick={() => void generateNow()} title="Ask the Oracle to write today's Daily Quest now">[GENERATE TODAY'S QUEST]</Btn>
+            </div></Field>
+            {testResult && <div className={testResult.ok ? "copy mt-1" : "error-inline mt-1"} role="status" style={testResult.ok ? { color: "var(--sl-gold)" } : undefined}>{testResult.detail}</div>}
             <Field label="Ask the System" hint="Opens the answer as a System window."><div className="flex w-full gap-2">
               <input className="sys-input flex-1" placeholder="Why is my VIT lagging?" aria-label="Ask the System" value={question} maxLength={300} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void ask(); }} />
               <Btn primary disabled={asking || !cfg.oracle.enabled || !apiKey} onClick={() => void ask()}>{asking ? "[…]" : "[ASK]"}</Btn>

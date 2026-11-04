@@ -52,6 +52,19 @@ export interface Oracle {
   ask(state: State, question: string): Promise<OracleResult | null>;
   spentTodayUsd(): number;
   enabled(): boolean;
+  /** The most recent failure in plain text (HTTP status / API message), or undefined. Not deduplicated. */
+  lastError(): string | undefined;
+  /** Tiny real request to prove key, model and network work. Costs well under a cent. */
+  test(): Promise<{ ok: boolean; detail: string; model: string }>;
+}
+
+/** Render an SDK/API error as one readable line. */
+export function describeError(e: unknown): string {
+  if (!e) return "unknown error";
+  const err = e as { status?: number; message?: string; error?: { error?: { message?: string; type?: string } }; name?: string };
+  const api = err.error?.error;
+  const parts = [err.status ? `HTTP ${err.status}` : "", api?.type ?? "", api?.message ?? err.message ?? String(e)].filter(Boolean);
+  return parts.join(" · ").slice(0, 300);
 }
 
 // $/MTok. Cache reads ~ 0.05x (Opus) / 0.1x (Haiku); cache writes 1.25x input. Approximate.
@@ -82,7 +95,9 @@ export function createOracle(opts: OracleOptions): Oracle {
   const now = opts.now ?? (() => new Date());
   const factory = opts.client ?? defaultClient;
   const logged = new Set<string>();
+  let lastError: string | undefined;
   const logOnce = (msg: string, err?: unknown) => {
+    lastError = err ? `${msg} — ${describeError(err)}` : msg;
     if (logged.has(msg)) return;
     logged.add(msg);
     (opts.log ?? ((m, e) => console.warn(`[oracle] ${m}`, e ?? "")))(msg, err);
@@ -163,6 +178,29 @@ export function createOracle(opts: OracleOptions): Oracle {
   return {
     enabled,
     spentTodayUsd,
+    lastError: () => lastError,
+    async test() {
+      const c = cfg();
+      const model = c.flavorModel || "claude-haiku-5-5";
+      const apiKey = await opts.getApiKey();
+      if (!apiKey) return { ok: false, detail: "No API key saved.", model };
+      try {
+        let client = clients.get(apiKey);
+        if (!client) { client = factory(apiKey); clients.set(apiKey, client); }
+        const res = await client.messages.create({
+          model, max_tokens: 16, thinking: { type: "adaptive" }, output_config: { effort: "low" },
+          system: [{ type: "text", text: "Reply with the single word OK." }],
+          messages: [{ role: "user", content: "Status check." }],
+        });
+        addSpend(costOf(model, res.usage));
+        const text = res.content.find((b) => b.type === "text")?.text ?? "";
+        lastError = undefined;
+        return { ok: true, detail: `Connected. ${model} replied: ${text.trim().slice(0, 40) || res.stop_reason}`, model };
+      } catch (e) {
+        lastError = describeError(e);
+        return { ok: false, detail: lastError, model };
+      }
+    },
     dayStart(state) {
       const day = state.today;
       if (!day || day.goals.length === 0) { logOnce("dayStart: no open day / goals"); return Promise.resolve(null); }

@@ -55,3 +55,15 @@ export async function askTheSystem(question: string): Promise<SystemWindowSpec |
 }
 
 export const oracleSpentTodayUsd = () => getOracle().spentTodayUsd();
+
+export const testOracle = () => getOracle().test();
+export const lastOracleError = () => getOracle().lastError();
+
+/** Generate (or re-show) today's Oracle Daily Quest right now, e.g. right after enabling the Oracle. */
+export async function regenerateToday(): Promise<SystemWindowSpec | null> {
+  const state = gameStore.getState().state;
+  if (!state?.today) return null;
+  const r = await getOracle().dayStart(state);
+  if (r?.spec) show({ ...r.spec, id: `daily-${state.today.date}` });
+  return r?.spec ?? null;
+}
