@@ -1,4 +1,5 @@
 /** Maps a System-window Action (from a pop-up button or in-block control) to events / navigation. */
+import type { StatId } from "../engine";
 import type { Action } from "../system/spec";
 import { focusMainWindow } from "../lib/tauri";
 import { gameStore } from "./game";
@@ -34,7 +35,7 @@ export function handleAction(action: Action): void {
       return;
     }
     case "allocate:points": {
-      const stat = action.arg as keyof State["stats"] | undefined;
+      const stat = action.arg as StatId | undefined;
       if (stat && state.stats[stat] && state.player.abilityPoints > 0) dispatch({ type: "POINTS_ALLOCATED", stat, points: 1 });
       else { ui.setScreen("status"); void focusMainWindow(); }
       return;
@@ -48,7 +49,7 @@ export function handleAction(action: Action): void {
       return;
     case "extract:shadow": {
       const [stat, ...name] = (action.arg ?? "").split(":");
-      if (state.stats[stat as keyof State["stats"]]) dispatch({ type: "SHADOW_EXTRACTED", stat: stat as keyof State["stats"], name: name.join(":") || "Shadow" });
+      if (state.stats[stat as StatId]) dispatch({ type: "SHADOW_EXTRACTED", stat: stat as StatId, name: name.join(":") || "Shadow" });
       else { ui.setScreen("shadows"); void focusMainWindow(); }
       return;
     }
