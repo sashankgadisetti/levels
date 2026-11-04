@@ -4,7 +4,7 @@ Target: a usable first build ("Phase 0 + 1") the same night, then weekly
 phases. Each phase ends with something you can run. Priorities match the
 tags in `02-features.md`.
 
-## Phase 0 — Foundation (tonight)
+## Phase 0 — Foundation (tonight) — ✅ done, verified
 
 | # | Task | Done when |
 |---|---|---|
@@ -14,6 +14,13 @@ tags in `02-features.md`.
 | 0.4 | HTML prototype of every pop-up (`docs/prototype/index.html`) as the visual spec | Screenshots in `docs/prototype/screenshots/` |
 | 0.5 | Oracle module: schema, prompts, client, cache, fallback; Settings field for the API key | Mocked tests pass; with a key, "Ask the System" returns a rendered window |
 | 0.6 | Plan docs 01–05 committed | this file |
+
+### What was verified (browser build with Playwright, and the real Tauri binary on a virtual display)
+- Onboarding → Daily Quest issued as a **separate always-on-top pop-up window** top-right of the screen.
+- Logging all four goals pays rewards immediately (240 XP → Lv 4 on day one), Random Box opens, level-up ceremonies queue.
+- 03:00 day boundary issues the next quest; a skipped day produces `[DAILY QUEST FAILED]` → `[PENALTY QUEST: SURVIVE]` with makeup goals and the red banner.
+- Reload restores state; no console errors.
+- Oracle live: "Ask the System" and the generated Daily Quest (replacing the template window in place) at ≈2–4¢ per call.
 
 ## Phase 1 — Core loop (week 1)
 

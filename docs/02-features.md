@@ -173,16 +173,15 @@ Every morning the System issues a Daily Quest with four goals, one per stat. The
 
 Design goal: the penalty must sting enough to matter, take under ~4 hours of one afternoon's attention, and always be escapable the same day.
 
-#### Triggers [MVP]
-| Trigger | Result |
-|---|---|
-| Day boundary passes with **0 of 4** goals cleared | Full Penalty Mode |
-| Day boundary passes with **1** goal cleared | Warning only: "Partial penalty" = -XP, streak of missed stat(s) freezes (not broken) |
-| 2-3 goals cleared | No penalty; missed stats' streaks break (unless Tenacity) |
-| Skipping 2 days in a row | Penalty Mode with +1h survive timer (5 h), shop lock extended to 24 h |
-| Rest/sick/travel mode or Stealth active | Never triggers |
+#### Triggers [MVP] — as shipped in `src/engine/penalty.ts`
+| Day result at the boundary | Rule | Consequence |
+|---|---|---|
+| **Clear** — every non-rest goal done | Rewards are paid **immediately** when the last goal is logged (XP + full-clear bonus, gold, Random Box, +1 ability point, level-ups) | Streaks +1 |
+| **Partial** — 2–3 of 4 done | XP/gold for done goals, no bonus | Streaks of the missed stats break (a Streak Shield is consumed first; Tenacity forgives one miss per week); −5 HP per missed VIT/SENSE goal |
+| **Fail** — 0–1 of 4 done, *or* a partial day right after a partial/fail day | Penalty Mode | `[PENALTY QUEST: SURVIVE]` with a 4-hour timer, −20 HP, shop locked, streaks of missed stats break |
+| Quiet hours / Stealth active | Pop-ups are held, the rule still applies | — |
 
-(Opinion: the original anime punishes *any* miss. We soften to "0 of 4 or 2 days in a row" because partial progress should be rewarded; a life-RPG that triggers every time you miss a gym day will be abandoned.)
+(Opinion: the original anime punishes *any* miss. We soften to the table above because partial progress should be rewarded; a life-RPG that triggers every time you miss a gym day will be abandoned. Two mediocre days in a row is the line.)
 
 #### Penalty Mode flow [MVP]
 1. At the day boundary (default 03:00) the app computes the result. If triggered, the next time the app is open or at wake time, a red `[PENALTY QUEST: SURVIVE]` window opens with `04:00:00` countdown and alarm sound.
