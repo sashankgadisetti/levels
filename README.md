@@ -8,7 +8,7 @@ Quest**; finishing them levels you up in four stats:
 | **STRENGTH** | Gym / working out |
 | **INTELLIGENCE** | Learning for your career |
 | **SENSE** | Sleeping every night |
-| **VITALITY** (HP) | Eating healthy |
+| **VITALITY** (HP) | Eating healthy, plus a yes/no water check-in every 90 minutes |
 
 The System pops floating blue windows on your screen exactly like the anime:
 daily quests in the morning, warnings before the deadline, level-ups, titles,

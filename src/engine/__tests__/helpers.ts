@@ -10,6 +10,9 @@ export const T = (date: string, hm: string) => {
   return new Date(y, m - 1, d, h, mi, 0, 0).toISOString();
 };
 
+/** DEFAULT_CONFIG without yes/no check-in habits (water): the four-goal quest most assertions were written for. */
+export const TEST_CONFIG: Config = { ...DEFAULT_CONFIG, habits: DEFAULT_CONFIG.habits.filter((h) => !h.checkIn) };
+
 export interface Run { s: State; fx: Effect[] }
 export function feed(r: Run, ...events: Event[]): Run {
   let s = r.s; const fx = [...r.fx];
@@ -20,7 +23,7 @@ export const popups = (fx: Effect[]) => fx.flatMap((e) => (e.kind === "popup" ? 
 export const titles = (fx: Effect[]) => popups(fx).map((p) => p.title);
 
 /** Accepted player whose first quest (Mon 2026-11-02) is open. */
-export function started(config: Config = DEFAULT_CONFIG, mutate?: (s: State) => void): Run {
+export function started(config: Config = TEST_CONFIG, mutate?: (s: State) => void): Run {
   let s = createInitialState(config);
   mutate?.(s);
   return feed({ s, fx: [] }, { type: "PLAYER_ACCEPTED", name: "Tester", at: T("2026-11-02", "08:00") }, { type: "TICK", at: T("2026-11-02", "08:01") });

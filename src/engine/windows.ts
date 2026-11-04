@@ -1,6 +1,6 @@
 /** Template System windows. Voice: bracketed, deadpan, second person. All specs are validated by parseSpec. */
 import { parseSpec, type SystemWindowInput, type SystemWindowSpec } from "../system/spec";
-import type { DailyQuest, Goal, HunterRank, Item, Penalty, Shadow, Skill, StatId, State, Title } from "./types";
+import type { DailyQuest, Goal, HabitDef, HunterRank, Item, Penalty, Shadow, Skill, StatId, State, Title } from "./types";
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const isTest = () => !!(globalThis as { process?: { env?: Record<string, string> } }).process?.env?.VITEST;
@@ -18,7 +18,7 @@ const statLabel = (s: string) => STAT_LABEL[s] ?? s;
 const close = { label: "CLOSE", kind: "dismiss" as const };
 
 function goalRow(g: Goal) {
-  return { type: "goalRow" as const, goalId: g.id, label: clip(g.label, 48), current: g.current, target: g.target, unit: clip(g.unit, 12), stat: g.stat, done: g.done };
+  return { type: "goalRow" as const, goalId: g.id, label: clip(g.label, 48), current: g.current, target: g.target, unit: clip(g.unit, 12), stat: g.stat, done: g.done, ...(g.mode ? { mode: g.mode } : {}) };
 }
 export interface PenaltyGoalView { goalId: string; label: string; stat: StatId; unit: string; current: number; target: number; done: boolean }
 const penaltyRow = (g: PenaltyGoalView) => ({ type: "goalRow" as const, goalId: g.goalId, label: clip(g.label, 48), current: g.current, target: g.target, unit: clip(g.unit, 12), stat: g.stat, done: g.done });
@@ -262,5 +262,19 @@ export function statusWindow(state: State): SystemWindowSpec {
       { type: "text", text: `Available ability points: ${p.abilityPoints}`, tone: "dim" },
     ],
     actions: [{ label: "CLOSE", kind: "dismiss", primary: true }], sound: "ding", timeoutMs: 0,
+  });
+}
+
+/** Yes/no check-in prompt for a habit with `checkIn` (e.g. "Have you had water?"). */
+export function checkIn(habit: HabitDef, goal: Goal, n: number): SystemWindowSpec {
+  const q = habit.checkIn?.question ?? `Have you done "${habit.label}" since the last check?`;
+  return make({
+    id: `checkin-${habit.id}-${n}`, variant: "quest", title: `${clip(habit.label, 40).toUpperCase()} CHECK`, glyph: "diamond",
+    blocks: [
+      { type: "text", text: clip(q, 200), tone: "cyan" },
+      { type: "text", text: `${goal.current} / ${goal.target} ${goal.unit} today.`, tone: "dim" },
+    ],
+    actions: [{ label: "YES", kind: "answer:yes", arg: habit.id, primary: true }, { label: "NO", kind: "answer:no", arg: habit.id }],
+    sound: "ding", timeoutMs: 120_000,
   });
 }

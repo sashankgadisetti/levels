@@ -23,6 +23,8 @@ export interface HabitDef {
   restDays?: Weekday[];        // days on which the goal is auto-satisfied as "rest"
   logPrevNight?: boolean;      // sleep: logged in the morning for last night
   scalePerLevel?: number;      // target growth per player level (default 0)
+  /** Yes/no check-in prompts (e.g. water): the System asks every N minutes inside the window; YES = +1. */
+  checkIn?: { everyMinutes: number; from: string; to: string; question?: string };
 }
 export interface Config {
   player: { name: string; dayEndsAt: string /* "HH:MM" */; timezone?: string };
@@ -35,7 +37,7 @@ export interface Config {
   oracle: { enabled: boolean; model: string; flavorModel: string; dailyBudgetUsd: number };
 }
 
-export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */ }
+export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */; mode?: "yesno" /* logged one yes at a time, no amounts */ }
 export interface DailyQuest { date: YMD; goals: Goal[]; startedAt: ISO; closedAt?: ISO; rewardedAt?: ISO /* full-clear rewards paid at this time */; result?: "clear" | "partial" | "fail"; xpEarned?: number; goldEarned?: number }
 
 export interface Item { id: string; defId: string; name: string; rarity: Rarity; description: string; consumable: boolean; obtainedAt: ISO }
@@ -83,6 +85,7 @@ export interface State {
   tenacityUsedWeek?: string;                         // ISO week "2026-W45"
   pendingExtractions?: PendingExtraction[];
   counters?: Record<string, number>;                 // title-condition counters
+  checkIns?: Record<string, ISO>;                    // last yes/no prompt time per habit id
   lastGymDate?: YMD;
   queuedPopups?: SystemWindowSpec[];                 // held back by quiet hours / Stealth
 }
@@ -106,6 +109,7 @@ export type Event =
   | { type: "SKILL_USED"; skillId: string; at: ISO; hours?: number /* Stealth duration, default 4 */ }
   | { type: "DUNGEON_CLEARED"; rank: HunterRank; minutes: number; bossName: string; at: ISO }
   | { type: "GATE_RESULT"; week: string; cleared: boolean; at: ISO }
+  | { type: "CHECKIN_ANSWERED"; habitId: string; yes: boolean; at: ISO }
   | { type: "TICK"; at: ISO }
   | { type: "CONFIG_CHANGED"; patch: Partial<Config>; at: ISO };
 

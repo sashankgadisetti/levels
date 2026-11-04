@@ -20,7 +20,7 @@ export function buildDailyQuest(config: Config, date: YMD, level: number, starte
       const rest = !!h.restDays?.includes(wd);
       return {
         id: goalIdFor(date, h.id), habitId: h.id, stat: h.stat, label: rest ? `${h.label} (rest day)` : h.label,
-        target, unit: h.unit, current: rest ? target : 0, done: rest, ...(rest ? { rest: true } : {}),
+        target, unit: h.unit, current: rest ? target : 0, done: rest, ...(rest ? { rest: true } : {}), ...(h.checkIn ? { mode: "yesno" as const } : {}),
       };
     });
   return { date, goals, startedAt: startedAt ?? dayBounds(date, config.player.dayEndsAt).start };

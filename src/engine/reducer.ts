@@ -11,14 +11,14 @@ import { buildDailyQuest, habitOf, isFullClear, setGoalValue } from "./quests";
 import { rankForLevel, rankIndex } from "./rank";
 import { useSkill } from "./skills";
 import { shadowGold, shadowRankFor, updateStreaks } from "./streaks";
-import { addDays, daysBetween, isoWeek, localDate, monthOf } from "./time";
+import { addDays, daysBetween, inQuietHours, isoWeek, localDate, monthOf } from "./time";
 import { titleGoldBonus, titleXpBonus } from "./titles";
 import { checkUnlocks } from "./unlocks";
 import { addHp, addMp, goalVitals, missedHpLoss } from "./vitals";
 import { applyXp, xpToNext } from "./xp";
 import { hoursUntilDayEnd } from "./selectors";
 import * as W from "./windows";
-import type { Config, Event, HunterRank, ReduceResult, State, StatId, YMD } from "./types";
+import type { Config, Event, HunterRank, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
 
 const STATS: StatId[] = ["STR", "VIT", "AGI", "INT", "SENSE"];
 const HISTORY_CAP = 800;
@@ -223,6 +223,33 @@ function touchGoal(c: Ctx, goalId: string, fn: (v: number) => number): void {
   if (!q.rewardedAt && isFullClear(q)) rewardClear(c, q);
 }
 
+/** Yes/no prompts (e.g. water): ask every `everyMinutes` inside the habit's window until today's goal is met. */
+function runCheckIns(c: Ctx, q: DailyQuest): void {
+  const s = c.s;
+  const now = new Date(c.at).getTime();
+  for (const h of s.config.habits) {
+    if (!h.checkIn) continue;
+    const g = q.goals.find((x) => x.habitId === h.id);
+    if (!g || g.done || g.rest) continue;
+    if (!inQuietHours(c.at, { from: h.checkIn.from, to: h.checkIn.to })) continue; // outside the active window
+    const last = s.checkIns?.[h.id];
+    if (last && now - new Date(last).getTime() < h.checkIn.everyMinutes * 60_000) continue;
+    (s.checkIns ??= {})[h.id] = c.at;
+    popup(c, W.checkIn(h, g, Math.round(now / 60_000)), { droppable: true });
+  }
+}
+
+function answerCheckIn(c: Ctx, habitId: string, yes: boolean): void {
+  const s = c.s, h = s.config.habits.find((x) => x.id === habitId);
+  if (!h) return;
+  const g = s.today?.goals.find((x) => x.habitId === habitId);
+  const every = h.checkIn?.everyMinutes ?? 90;
+  // YES: log one; next prompt after the normal interval. NO: ask again in 15 minutes.
+  const backoffMin = yes ? 0 : Math.max(0, every - 15);
+  (s.checkIns ??= {})[habitId] = new Date(new Date(c.at).getTime() - backoffMin * 60_000).toISOString();
+  if (yes && g && !g.done) touchGoal(c, g.id, (v) => v + 1);
+}
+
 function tick(c: Ctx): void {
   const s = c.s;
   s.lastTickAt = c.at;
@@ -241,6 +268,7 @@ function tick(c: Ctx): void {
       popup(c, W.warning(left, q.goals), { droppable: true });
     }
   }
+  if (q) runCheckIns(c, q);
   const p = s.penalty;
   if (p && !p.cleared && c.at >= p.endsAt && p.warnedDate !== cur) {
     s.penalty = { ...p, warnedDate: cur };
@@ -363,6 +391,7 @@ function apply(c: Ctx, ev: Event): void {
       announceLevel(c, lvl);
       return;
     }
+    case "CHECKIN_ANSWERED": answerCheckIn(c, ev.habitId, ev.yes); return;
     case "TICK": tick(c); return;
     case "CONFIG_CHANGED":
       s.config = { ...s.config, ...ev.patch };

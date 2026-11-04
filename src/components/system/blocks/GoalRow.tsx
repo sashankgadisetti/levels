@@ -71,7 +71,14 @@ export function GoalRow({ block, onAction, prevNight }: Props) {
       <div className="bar-wrap">
         <div className="sys-bar thin"><i style={{ width: `${pct(cur, block.target)}%` }} /></div>
       </div>
-      {onAction && !done && (
+      {onAction && !done && block.mode === "yesno" && (
+        <div className="quick" key="quick">
+          <button className="qbtn done-btn" onClick={() => add(1)} title="Mark complete" aria-label={`Yes, log one for ${label}`}>Yes, I did</button>
+          <span className="grow" />
+          {logged && <span className="logged" role="status">{logged}</span>}
+        </div>
+      )}
+      {onAction && !done && block.mode !== "yesno" && (
         <div className="quick" key="quick">
           {kind === "minutes" && MINUTE_CHIPS.map((m) => <button key={m} className="qbtn" onClick={() => add(m)} aria-label={`Add ${m} minutes to ${label}`}>+{m}</button>)}
           {kind === "hours" && HOUR_CHIPS.map((h) => <button key={h} className="qbtn" onClick={() => setTo(h)} aria-label={`Log ${h} hours for ${label}`}>{h}h</button>)}

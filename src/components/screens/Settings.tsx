@@ -167,6 +167,21 @@ export function Settings() {
                         <label className="ml-2 flex items-center gap-2 text-[15px]"><input type="checkbox" checked={!!h.logPrevNight} onChange={(e) => setHabit(i, { logPrevNight: e.target.checked || undefined })} className="h-4 w-4 accent-[var(--sl-cyan)]" /> Log it for last night (sleep)</label>
                       )}
                     </div>
+                    {h.kind === "count" && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[15px]">
+                        <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-[var(--sl-cyan)]" checked={!!h.checkIn} aria-label={`Ask me yes/no for ${h.label || "this goal"}`}
+                          onChange={(e) => setHabit(i, { checkIn: e.target.checked ? { everyMinutes: 90, from: "09:00", to: "21:00", question: `Have you done "${h.label || "this"}" since the last check?` } : undefined })} /> Ask me yes/no</label>
+                        {h.checkIn && (<>
+                          <span className="sub">every</span>
+                          <input className="sys-input num !w-20" type="number" min={15} step={15} aria-label="Minutes between check-ins" value={h.checkIn.everyMinutes} onChange={(e) => setHabit(i, { checkIn: { ...h.checkIn!, everyMinutes: Math.max(15, Number(e.target.value) || 90) } })} />
+                          <span className="sub">min, between</span>
+                          <input className="sys-input num !w-28" type="time" aria-label="Check-ins from" value={h.checkIn.from} onChange={(e) => setHabit(i, { checkIn: { ...h.checkIn!, from: e.target.value } })} />
+                          <span className="sub">and</span>
+                          <input className="sys-input num !w-28" type="time" aria-label="Check-ins until" value={h.checkIn.to} onChange={(e) => setHabit(i, { checkIn: { ...h.checkIn!, to: e.target.value } })} />
+                          <input className="sys-input flex-1 min-w-[220px]" aria-label="Check-in question" maxLength={120} value={h.checkIn.question ?? ""} placeholder="Question the System asks" onChange={(e) => setHabit(i, { checkIn: { ...h.checkIn!, question: e.target.value } })} />
+                        </>)}
+                      </div>
+                    )}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <span className="sub mr-2">Rest days</span>
                       {DAYS.map((d) => {

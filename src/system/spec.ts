@@ -21,7 +21,7 @@ export const Action = z.object({
   kind: z.enum([
     "dismiss", "accept", "decline",
     "open:status", "open:quest", "open:shop", "open:shadows", "open:inventory",
-    "complete:goal", "progress:goal", "allocate:points", "start:dungeon", "open:box", "use:item", "extract:shadow",
+    "complete:goal", "progress:goal", "answer:yes", "answer:no", "allocate:points", "start:dungeon", "open:box", "use:item", "extract:shadow",
   ]),
   arg: z.string().max(64).optional(),
   primary: z.boolean().optional(),
@@ -30,7 +30,7 @@ export type Action = z.infer<typeof Action>;
 
 export const Block = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), text: z.string().max(400), tone: Tone.optional(), align: z.enum(["left", "center"]).optional() }),
-  z.object({ type: z.literal("goalRow"), goalId: z.string(), label: z.string().max(48), current: z.number(), target: z.number(), unit: z.string().max(12), stat: z.string().max(8).optional(), done: z.boolean().optional() }),
+  z.object({ type: z.literal("goalRow"), goalId: z.string(), label: z.string().max(48), current: z.number(), target: z.number(), unit: z.string().max(12), stat: z.string().max(8).optional(), done: z.boolean().optional(), mode: z.enum(["yesno"]).optional() }),
   z.object({ type: z.literal("statRow"), stat: z.string().max(16), value: z.number(), delta: z.number().optional(), max: z.number().optional(), locked: z.boolean().optional() }),
   z.object({ type: z.literal("bar"), label: z.string().max(24), value: z.number(), max: z.number(), tone: Tone.optional() }),
   z.object({ type: z.literal("kv"), rows: z.array(z.tuple([z.string().max(32), z.string().max(64)])).max(12) }),

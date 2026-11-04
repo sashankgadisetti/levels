@@ -13,6 +13,8 @@ export const DEFAULT_CONFIG: Config = {
     { id: "study", stat: "INT", label: "Study for career", kind: "minutes", target: 60, unit: "min" },
     { id: "sleep", stat: "SENSE", label: "Sleep", kind: "hours", target: 7, unit: "h", logPrevNight: true },
     { id: "eat", stat: "VIT", label: "Clean meals", kind: "count", target: 3, unit: "meals" },
+    { id: "water", stat: "VIT", label: "Drink water", kind: "count", target: 5, unit: "check-ins",
+      checkIn: { everyMinutes: 90, from: "09:00", to: "21:00", question: "Have you had water since the last check?" } },
   ],
   curves: { xpPerGoal: 30, fullClearBonus: 120, levelExponent: 1.3, levelBase: 30, pointsPerLevel: 3 },
   economy: { goldPerGoal: 10, goldFullClear: 50, goldGate: 300, monthlyBudgetUsd: 150, usdToGold: 20 },

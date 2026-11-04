@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../config";
+import { TEST_CONFIG } from "./helpers";
 import { buildDailyQuest } from "../quests";
 import { selectors } from "../index";
 import { applyXp } from "../xp";
@@ -11,11 +12,11 @@ const tenacity = { id: "tenacity", name: "Tenacity", kind: "passive" as const, e
 
 describe("quests", () => {
   it("rest day pre-clears STR; scaling applies", () => {
-    const q = buildDailyQuest(DEFAULT_CONFIG, "2026-11-01", 1); // Sunday
+    const q = buildDailyQuest(TEST_CONFIG, "2026-11-01", 1); // Sunday
     const gym = q.goals.find((g) => g.habitId === "gym")!;
     expect(gym).toMatchObject({ rest: true, done: true });
     expect(q.goals.filter((g) => g.done)).toHaveLength(1);
-    const mon = buildDailyQuest({ ...DEFAULT_CONFIG, habits: DEFAULT_CONFIG.habits.map((h) => (h.id === "study" ? { ...h, scalePerLevel: 2 } : h)) }, MON, 11);
+    const mon = buildDailyQuest({ ...TEST_CONFIG, habits: TEST_CONFIG.habits.map((h) => (h.id === "study" ? { ...h, scalePerLevel: 2 } : h)) }, MON, 11);
     expect(mon.goals.find((g) => g.habitId === "study")!.target).toBe(80);
     expect(mon.goals.find((g) => g.habitId === "gym")!.rest).toBeUndefined();
   });
@@ -219,7 +220,7 @@ describe("day close", () => {
     r = nextDay(r); // day 1 fails at 03:05 next day, outside stealth
     expect(popups(r.fx.slice(n)).some((p) => p.variant === "penalty")).toBe(true);
     // popups fired while quiet go to the queue and are released later; penalty passes through
-    let q = started({ ...DEFAULT_CONFIG, popups: { warnHoursBefore: [3, 1], quietHours: { from: "02:00", to: "04:00" } } });
+    let q = started({ ...TEST_CONFIG, popups: { warnHoursBefore: [3, 1], quietHours: { from: "02:00", to: "04:00" } } });
     const m = q.fx.length;
     q = nextDay(q);
     const got = popups(q.fx.slice(m)).map((p) => p.title);
@@ -241,7 +242,7 @@ describe("day close", () => {
     expect(popups(c.fx.slice(m)).filter((p) => p.title === "WARNING")).toHaveLength(0);
   });
   it("oracle effect on day start when enabled", () => {
-    const r = started({ ...DEFAULT_CONFIG, oracle: { ...DEFAULT_CONFIG.oracle, enabled: true } });
+    const r = started({ ...TEST_CONFIG, oracle: { ...DEFAULT_CONFIG.oracle, enabled: true } });
     expect(r.fx.some((e) => e.kind === "oracle" && e.request === "dayStart")).toBe(true);
     expect(started().fx.some((e) => e.kind === "oracle")).toBe(false);
   });
@@ -268,3 +269,41 @@ describe("day close", () => {
   });
 });
 export type _E = Event;
+
+
+describe("yes/no check-ins (water)", () => {
+  const WATER = DEFAULT_CONFIG; // includes the water habit with a 90-minute check-in between 09:00 and 21:00
+  const water = (r: ReturnType<typeof started>) => r.s.today!.goals.find((g) => g.habitId === "water")!;
+  it("asks inside the window, not before, and respects the interval", () => {
+    let r = started(WATER);
+    expect(water(r).mode).toBe("yesno");
+    r = feed(r, { type: "TICK", at: T(MON, "08:30") });
+    expect(titles(r.fx).some((t) => /DRINK WATER CHECK/i.test(t))).toBe(false);
+    r = { s: r.s, fx: [] };
+    r = feed(r, { type: "TICK", at: T(MON, "09:30") });
+    expect(titles(r.fx)).toContain("DRINK WATER CHECK");
+    r = { s: r.s, fx: [] };
+    r = feed(r, { type: "TICK", at: T(MON, "10:00") });
+    expect(titles(r.fx)).not.toContain("DRINK WATER CHECK");
+    r = { s: r.s, fx: [] };
+    r = feed(r, { type: "TICK", at: T(MON, "11:01") });
+    expect(titles(r.fx)).toContain("DRINK WATER CHECK");
+  });
+  it("YES logs one; NO re-asks after 15 minutes; stops when the goal is met", () => {
+    let r = started(WATER);
+    r = feed(r, { type: "TICK", at: T(MON, "09:30") });
+    r = feed(r, { type: "CHECKIN_ANSWERED", habitId: "water", yes: false, at: T(MON, "09:31") });
+    r = { s: r.s, fx: [] };
+    r = feed(r, { type: "TICK", at: T(MON, "09:40") });
+    expect(titles(r.fx)).not.toContain("DRINK WATER CHECK");
+    r = feed(r, { type: "TICK", at: T(MON, "09:47") });
+    expect(titles(r.fx)).toContain("DRINK WATER CHECK");
+    r = feed(r, { type: "CHECKIN_ANSWERED", habitId: "water", yes: true, at: T(MON, "09:48") });
+    expect(water(r).current).toBe(1);
+    for (let i = 0; i < 4; i++) r = feed(r, { type: "CHECKIN_ANSWERED", habitId: "water", yes: true, at: T(MON, "12:00") });
+    expect(water(r).done).toBe(true);
+    r = { s: r.s, fx: [] };
+    r = feed(r, { type: "TICK", at: T(MON, "15:00") });
+    expect(titles(r.fx)).not.toContain("DRINK WATER CHECK");
+  });
+});

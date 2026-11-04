@@ -36,6 +36,10 @@ export function handleAction(action: Action, ctx: { windowId?: string } = {}): v
       else dispatch({ type: "GOAL_SET", goalId: id, value: Math.max(0, g.current + delta) });
       return;
     }
+    case "answer:yes":
+    case "answer:no":
+      if (action.arg) dispatch({ type: "CHECKIN_ANSWERED", habitId: action.arg, yes: action.kind === "answer:yes" });
+      return;
     case "complete:goal": {
       const g = goal(action.arg);
       if (g && !g.done) dispatch({ type: "GOAL_PROGRESS", goalId: g.id, delta: Math.max(1, g.target - g.current) });

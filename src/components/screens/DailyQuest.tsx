@@ -49,7 +49,7 @@ export function DailyQuest() {
                     <div className="c mono tone-gold text-[16px]">&#10003; rest</div>
                   </div>
                 ) : (
-                  <GoalRow key={g.id} onAction={handleAction} prevNight={cfg.habits.find((h) => h.id === g.habitId)?.logPrevNight} block={{ type: "goalRow", goalId: g.id, label: g.label, current: g.current, target: g.target, unit: g.unit, stat: statShort(cfg, g.stat), done: g.done }} />
+                  <GoalRow key={g.id} onAction={handleAction} prevNight={cfg.habits.find((h) => h.id === g.habitId)?.logPrevNight} block={{ type: "goalRow", goalId: g.id, label: g.label, current: g.current, target: g.target, unit: g.unit, stat: statShort(cfg, g.stat), done: g.done, ...(g.mode ? { mode: g.mode } : {}) }} />
                 ),
               )}
             </div>

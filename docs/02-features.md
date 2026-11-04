@@ -183,6 +183,9 @@ Design goal: the penalty must sting enough to matter, take under ~4 hours of one
 
 (Opinion: the original anime punishes *any* miss. We soften to the table above because partial progress should be rewarded; a life-RPG that triggers every time you miss a gym day will be abandoned. Two mediocre days in a row is the line.)
 
+#### Yes/no check-ins [MVP] — shipped
+Some habits are better asked than measured. A habit with `checkIn` (default: **Drink water**, under VITALITY, target 5 per day) makes the System pop a small window every 90 minutes between 09:00 and 21:00: `[DRINK WATER CHECK] Have you had water since the last check? [YES] [NO]`. YES logs one check-in, NO re-asks in 15 minutes, and the prompts stop once the day's target is met or during quiet hours. The Daily Quest row for such a habit is a single "Yes, I did" button, never an amount. Any count habit can be switched to this mode in Settings → Goals.
+
 #### Penalty Mode flow [MVP]
 1. At the day boundary (default 03:00) the app computes the result. If triggered, the next time the app is open or at wake time, a red `[PENALTY QUEST: SURVIVE]` window opens with `04:00:00` countdown and alarm sound.
 2. The 4-hour timer is a **wall-clock timer that must be physically survived**: the app asks for a makeup task (see below) and the timer shows how long the penalty lasts if ignored.
