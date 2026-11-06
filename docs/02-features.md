@@ -132,6 +132,7 @@ Every morning the System issues a Daily Quest with four goals, one per stat. The
   - Max 3 declared rest days/week; the 4th consecutive rest day is flagged by the System ("[Rest is a decision. Four in a row is a drift.]").
   - A rest day never breaks the STR streak.
   - "Ad-hoc rest day" button is available once per week without a Tenacity charge when Fatigue >= 60.
+  - **Implemented:** a **Rest day** button on any Daily Quest goal whose habit has rest days. A habit gets as many rests per ISO week as it has `restDays` (the workout: 1). Taking one early uses the week's allowance, so the scheduled day becomes a normal day. At Fatigue >= 75 the STR goal can rest beyond the allowance. A rest pays half XP, gold and stat points and keeps the streak; **Undo** works until the day's rewards are paid. Engine: `GOAL_RESTED` / `GOAL_REST_UNDONE`, `src/engine/rest.ts`.
 
 #### Urgent Quests [V1]
 - **Description:** Surprise same-day mini-quests (e.g. "Walk 20 minutes before 18:00", "Drink 500 ml of water now", "Read 10 pages"), 1-2 per week by default, opt-in, 30-180 min timers.

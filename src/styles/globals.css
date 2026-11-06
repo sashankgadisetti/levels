@@ -195,6 +195,7 @@ select.sys-input option { background: #081428; }
 .qbtn:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent); color: #fff; }
 .qbtn:active { transform: scale(0.96); }
 .qbtn.done-btn { --accent: var(--sl-gold); font-family: var(--font-head); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase !important; }
+.qbtn.rest-btn { --accent: var(--sl-purple); font-family: var(--font-head); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase !important; }
 .sys-goal .qinput { width: 84px; min-height: 36px; text-align: right; flex: none; }
 /* compact rows inside pop-up windows so a four-goal quest fits on screen */
 .sys-pop { padding: 22px 26px 20px; }

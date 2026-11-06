@@ -2,7 +2,8 @@ import { fmtHMS } from "../../lib/format";
 import { GRADE_COLOR, gradeOf, nextDayEnd, questProgress, statShort } from "../../lib/derive";
 import { useNow } from "../../lib/hooks";
 import { handleAction } from "../../store/actions";
-import { useGameState } from "../../store/game";
+import { dispatch, useGameState } from "../../store/game";
+import { selectors, weekdayOf, type Goal, type State } from "../../engine";
 import { GoalRow } from "../system/blocks";
 import { usePopups } from "../../store/popups";
 import { useUi } from "../../store/ui";
@@ -45,11 +46,18 @@ export function DailyQuest() {
               {q.goals.map((g) =>
                 g.rest ? (
                   <div key={g.id} className="sys-goal rest done" data-testid={`goal-${g.id}`}>
-                    <div className="n">{g.label}<small>{statShort(cfg, g.stat)} · rest day</small></div>
-                    <div className="c mono tone-gold text-[16px]">&#10003; rest</div>
+                    <div className="n">{g.label}<small>{statShort(cfg, g.stat)} · rest day · half rewards, streak kept</small></div>
+                    <div className="c mono tone-gold text-[16px]">
+                      {selectors.canUndoRest(s, g) && (
+                        <button className="qbtn mr-3 align-middle" onClick={() => dispatch({ type: "GOAL_REST_UNDONE", goalId: g.id })} aria-label={`Undo rest day for ${g.label.replace(/ \(rest day\)$/, "")}`}>Undo</button>
+                      )}
+                      &#10003; rest
+                    </div>
                   </div>
                 ) : (
-                  <GoalRow key={g.id} onAction={handleAction} prevNight={cfg.habits.find((h) => h.id === g.habitId)?.logPrevNight} block={{ type: "goalRow", goalId: g.id, label: g.label, current: g.current, target: g.target, unit: g.unit, stat: statShort(cfg, g.stat), done: g.done, ...(g.mode ? { mode: g.mode } : {}) }} />
+                  <GoalRow key={g.id} onAction={handleAction} prevNight={cfg.habits.find((h) => h.id === g.habitId)?.logPrevNight}
+                    {...(selectors.canRest(s, g) ? { onRest: () => dispatch({ type: "GOAL_RESTED", goalId: g.id }), restTitle: restTitle(s, g) } : {})}
+                    block={{ type: "goalRow", goalId: g.id, label: g.label, current: g.current, target: g.target, unit: g.unit, stat: statShort(cfg, g.stat), done: g.done, ...(g.mode ? { mode: g.mode } : {}) }} />
                 ),
               )}
             </div>
@@ -78,6 +86,18 @@ export function DailyQuest() {
       </Panel>
     </div>
   );
+}
+
+/** Tooltip for the Rest day button: what it uses up this week. */
+function restTitle(s: State, g: Goal): string {
+  const h = s.config.habits.find((x) => x.id === g.habitId);
+  const allowance = selectors.restAllowance(s, g.habitId);
+  const left = allowance - selectors.restsUsed(s, g.habitId, s.today!.date);
+  if (left <= 0) return "Fatigue is high: an extra rest day for STRENGTH. Half rewards, streak kept.";
+  const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], today = order.indexOf(weekdayOf(s.today!.date));
+  const later = (h?.restDays ?? []).filter((d) => order.indexOf(d) > today); // scheduled rests still ahead this week
+  const moved = left === 1 && later.length ? ` ${later.join(", ")} becomes a normal day this week.` : "";
+  return `Uses ${left === 1 ? "this week's rest day" : `1 of ${left} rest days left this week`}. Half rewards, streak kept.${moved}`;
 }
 
 function PenaltyTimer({ endsAt }: { endsAt: string }) {

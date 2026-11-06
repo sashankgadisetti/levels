@@ -43,7 +43,7 @@ export interface Config {
   oracle: { enabled: boolean; model: string; flavorModel: string; dailyBudgetUsd: number };
 }
 
-export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */; mode?: "yesno" /* logged one yes at a time, no amounts */; statPaid?: number /* stat points already credited for this goal */ }
+export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */; mode?: "yesno" /* logged one yes at a time, no amounts */; statPaid?: number /* stat points already credited for this goal */; restManual?: boolean /* rested with the Rest day button */ }
 export interface DailyQuest { date: YMD; goals: Goal[]; startedAt: ISO; closedAt?: ISO; rewardedAt?: ISO /* full-clear rewards paid at this time */; result?: "clear" | "partial" | "fail"; xpEarned?: number; goldEarned?: number }
 
 export interface Item { id: string; defId: string; name: string; rarity: Rarity; description: string; consumable: boolean; obtainedAt: ISO }
@@ -103,6 +103,8 @@ export type Event =
   | { type: "DAY_STARTED"; date: YMD; at: ISO }
   | { type: "GOAL_PROGRESS"; goalId: string; delta: number; at: ISO }
   | { type: "GOAL_SET"; goalId: string; value: number; at: ISO }
+  | { type: "GOAL_RESTED"; goalId: string; at: ISO }
+  | { type: "GOAL_REST_UNDONE"; goalId: string; at: ISO }
   | { type: "DAY_CLOSED"; date: YMD; at: ISO }
   | { type: "PENALTY_PROGRESS"; goalId: string; delta: number; at: ISO }
   | { type: "PENALTY_CLEARED"; at: ISO }

@@ -3,6 +3,7 @@ import { DEFAULT_CONFIG } from "../config";
 import { addDays } from "../time";
 import { createInitialState, reduce } from "../reducer";
 import { STATE_REV } from "../migrate";
+import * as selectors from "../selectors";
 import type { State } from "../types";
 import { MON, T, complete, feed, nextDay, started } from "./helpers";
 
@@ -73,5 +74,60 @@ describe("hydration stat", () => {
     let r = started();
     r = feed(r, { type: "CONFIG_CHANGED", patch: { stats: DEFAULT_CONFIG.stats.filter((d) => d.id !== "HYD") }, at: T(MON, "09:00") });
     expect(r.s.config.stats.map((d) => d.id)).toContain("HYD");
+  });
+});
+
+describe("rest day button", () => {
+  const gymOf = (r: ReturnType<typeof started>) => r.s.today!.goals.find((g) => g.habitId === "gym")!;
+
+  it("rests the workout early in the week; Sunday then becomes a normal workout day", () => {
+    let r = started(); // Mon 2026-11-02
+    expect(selectors.canRest(r.s, gymOf(r))).toBe(true);
+    r = feed(r, { type: "GOAL_RESTED", goalId: gymOf(r).id, at: T(MON, "10:00") });
+    const g = gymOf(r);
+    expect(g).toMatchObject({ rest: true, restManual: true, done: true, label: "Workout (rest day)", statPaid: 0.5 });
+    expect(r.s.stats.STR.xp).toBe(50);
+    // the week's one rest is used: no second rest on Tuesday, and Sunday is not auto-rested
+    r = nextDay(complete(r, "all", T(MON, "12:00")));
+    expect(selectors.canRest(r.s, gymOf(r))).toBe(false);
+    for (let d = 1; d < 6; d++) r = nextDay(complete(r, "all", T(addDays(MON, d), "12:00")));
+    expect(r.s.today!.date).toBe("2026-11-08"); // Sunday
+    expect(gymOf(r).rest).toBeUndefined();
+    expect(gymOf(r).done).toBe(false);
+  });
+
+  it("without an early rest, Sunday still rests automatically", () => {
+    let r = started();
+    for (let d = 0; d < 6; d++) r = nextDay(complete(r, "all", T(addDays(MON, d), "12:00")));
+    expect(r.s.today!.date).toBe("2026-11-08");
+    expect(gymOf(r)).toMatchObject({ rest: true, done: true });
+    expect(gymOf(r).restManual).toBeUndefined();
+  });
+
+  it("high fatigue allows an extra STR rest; habits without rest days get no button", () => {
+    let r = started();
+    r = feed(r, { type: "GOAL_RESTED", goalId: gymOf(r).id, at: T(MON, "10:00") });
+    r = nextDay(complete(r, "all", T(MON, "12:00")));
+    r.s.vitals.fatigue = 80;
+    expect(selectors.canRest(r.s, gymOf(r))).toBe(true);
+    const study = r.s.today!.goals.find((g) => g.habitId === "study")!;
+    expect(selectors.canRest(r.s, study)).toBe(false);
+    r = feed(r, { type: "GOAL_RESTED", goalId: study.id, at: T("2026-11-03", "10:00") });
+    expect(r.s.today!.goals.find((g) => g.habitId === "study")!.rest).toBeUndefined();
+  });
+
+  it("undo restores the goal until the day's rewards are paid", () => {
+    let r = started();
+    r = feed(r, { type: "GOAL_RESTED", goalId: gymOf(r).id, at: T(MON, "10:00") });
+    r = feed(r, { type: "GOAL_REST_UNDONE", goalId: gymOf(r).id, at: T(MON, "10:01") });
+    expect(gymOf(r)).toMatchObject({ done: false, current: 0, label: "Workout" });
+    expect(gymOf(r).rest).toBeUndefined();
+    expect(r.s.stats.STR.xp).toBe(0);
+    // rest the last open goal: the clear pays out, and the rest can no longer be undone
+    r = complete(r, ["INT", "SENSE", "VIT"], T(MON, "11:00"));
+    r = feed(r, { type: "GOAL_RESTED", goalId: gymOf(r).id, at: T(MON, "12:00") });
+    expect(r.s.today!.rewardedAt).toBe(T(MON, "12:00"));
+    r = feed(r, { type: "GOAL_REST_UNDONE", goalId: gymOf(r).id, at: T(MON, "12:01") });
+    expect(gymOf(r).rest).toBe(true);
   });
 });

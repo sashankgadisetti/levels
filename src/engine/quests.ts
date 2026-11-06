@@ -9,15 +9,18 @@ export function scaledTarget(h: HabitDef, level: number): number {
   return Math.round((h.target + h.scalePerLevel * Math.max(0, level - 1)) * 10) / 10;
 }
 
-/** Build the Daily Quest for `date`. Rest days pre-clear the goal (rest: true, done: true). */
-export function buildDailyQuest(config: Config, date: YMD, level: number, startedAt?: ISO): DailyQuest {
+/**
+ * Build the Daily Quest for `date`. Scheduled rest days pre-clear the goal (rest: true, done: true), unless
+ * `restsTaken(habitId)` says that habit's weekly rest allowance was already used with the Rest day button.
+ */
+export function buildDailyQuest(config: Config, date: YMD, level: number, startedAt?: ISO, restsTaken: (habitId: string) => number = () => 0): DailyQuest {
   const wd = weekdayOf(date);
   const locked = new Set(config.stats.filter((s) => s.locked).map((s) => s.id));
   const goals: Goal[] = config.habits
     .filter((h) => !locked.has(h.stat))
     .map((h) => {
       const target = scaledTarget(h, level);
-      const rest = !!h.restDays?.includes(wd);
+      const rest = !!h.restDays?.includes(wd) && restsTaken(h.id) < h.restDays.length;
       return {
         id: goalIdFor(date, h.id), habitId: h.id, stat: h.stat, label: rest ? `${h.label} (rest day)` : h.label,
         target, unit: h.unit, current: rest ? target : 0, done: rest, ...(rest ? { rest: true } : {}), ...(h.checkIn ? { mode: "yesno" as const } : {}),

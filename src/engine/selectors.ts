@@ -9,6 +9,7 @@ import { restRecommended as restRec } from "./vitals";
 import type { HunterRank, ISO, RewardDef, Skill, StatId, State, Streak, Title } from "./types";
 
 export { rankForLevel, nextRankAt, canPurchase, rewardGoldPrice, penaltyGoals, isPenaltyActive };
+export { canRest, canUndoRest, restsUsed, restAllowance } from "./rest";
 export type { PurchaseCheck };
 
 export const xpToNext = (level: number, s?: State) => xpToNextRaw(level, s?.config.curves);

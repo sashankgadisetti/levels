@@ -17,6 +17,7 @@ import { checkUnlocks } from "./unlocks";
 import { addHp, addMp, goalVitals, missedHpLoss } from "./vitals";
 import { applyXp, goalStatPoints, STAT_XP_PER_POINT, xpToNext } from "./xp";
 import { migrate, STATE_REV, withHydration } from "./migrate";
+import { canRest, canUndoRest, restsUsed } from "./rest";
 import { hoursUntilDayEnd } from "./selectors";
 import * as W from "./windows";
 import type { Config, Event, Goal, HunterRank, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
@@ -107,7 +108,7 @@ function startDay(c: Ctx, date: YMD): void {
   const last = s.history[s.history.length - 1];
   if (last && last.date >= date) return; // that day is already closed
   if (last && daysBetween(last.date, date) >= 8) s.counters = { ...(s.counters ?? {}), comebackPending: 1 };
-  s.today = buildDailyQuest(s.config, date, s.player.level, c.at);
+  s.today = buildDailyQuest(s.config, date, s.player.level, c.at, (id) => restsUsed(s, id, date));
   s.warned = undefined;
   popup(c, W.dailyQuest(s));
   if (s.config.oracle.enabled) {
@@ -245,6 +246,26 @@ function touchGoal(c: Ctx, goalId: string, fn: (v: number) => number): void {
   if (!q.rewardedAt && isFullClear(q)) rewardClear(c, q);
 }
 
+const REST_SUFFIX = " (rest day)";
+/** Rest day button: the goal counts as a rest (done, half rewards, streak kept) and uses the week's allowance. */
+function restGoal(c: Ctx, goalId: string): void {
+  const s = c.s, q = s.today, g = q?.goals.find((x) => x.id === goalId);
+  if (!q || !g || !canRest(s, g)) return;
+  g.rest = true; g.restManual = true;
+  if (!g.label.endsWith(REST_SUFFIX)) g.label += REST_SUFFIX;
+  setGoalValue(g, g.target);
+  settleStat(s, g, q.date);
+  if (!q.rewardedAt && isFullClear(q)) rewardClear(c, q);
+}
+function undoRest(c: Ctx, goalId: string): void {
+  const s = c.s, q = s.today, g = q?.goals.find((x) => x.id === goalId);
+  if (!q || !g || !canUndoRest(s, g)) return;
+  delete g.rest; delete g.restManual;
+  if (g.label.endsWith(REST_SUFFIX)) g.label = g.label.slice(0, -REST_SUFFIX.length);
+  setGoalValue(g, 0);
+  settleStat(s, g, q.date);
+}
+
 /** Yes/no prompts (e.g. water): ask every `everyMinutes` inside the habit's window until today's goal is met. */
 function runCheckIns(c: Ctx, q: DailyQuest): void {
   const s = c.s;
@@ -354,6 +375,8 @@ function apply(c: Ctx, ev: Event): void {
     case "DAY_CLOSED": closeDay(c, ev.date); return;
     case "GOAL_PROGRESS": touchGoal(c, ev.goalId, (v) => v + ev.delta); return;
     case "GOAL_SET": touchGoal(c, ev.goalId, () => ev.value); return;
+    case "GOAL_RESTED": restGoal(c, ev.goalId); return;
+    case "GOAL_REST_UNDONE": undoRest(c, ev.goalId); return;
     case "PENALTY_PROGRESS": progressPenalty(c, ev.goalId, ev.delta); return;
     case "PENALTY_CLEARED": clearPenalty(c, "makeup"); return;
     case "POINTS_ALLOCATED": {
