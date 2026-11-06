@@ -56,13 +56,18 @@ export function Status() {
           {s.config.stats.map((d) => {
             const v = s.stats[d.id];
             const locked = d.locked;
-            const toNext = v.xp % 100;
+            const toward = Math.min(100, v.value); // the 100-point mark is ~3 months of daily consistency
+            const every = s.config.curves.statBonusEvery ?? 7;
+            const streak = s.streaks[d.id]?.current ?? 0;
+            const daysAway = every > 0 ? every - 1 - (streak % every) : -1; // today is streak day `streak + 1`
+            const hint = daysAway < 0 ? "+1 per goal" : daysAway === 0 ? "+2 for today's goal" : `+1 per goal · +2 ${daysAway === 1 ? "tomorrow" : `in ${daysAway} days`}`;
             const ready = !locked && pts > 0;
             return (
               <div key={d.id} className="grid items-center gap-3 py-1.5 text-[19px]" style={{ gridTemplateColumns: "150px 1fr 48px 40px", color: locked ? "var(--sl-locked-text)" : undefined }}>
-                <div>{d.label}<small className="block text-[13px] leading-none" style={{ color: locked ? "var(--sl-locked-text)" : "var(--sl-muted)" }}>{locked ? "Locked" : `${toNext}/100 xp to next point`}</small></div>
-                <div className="sys-bar" role="progressbar" aria-label={`${d.label} progress to next point`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={locked ? 0 : toNext}
-                  style={locked ? { borderColor: "var(--sl-locked)", ["--c" as string]: "var(--sl-locked)" } : undefined}><i style={{ width: `${locked ? 0 : toNext}%`, boxShadow: locked ? "none" : undefined }} /></div>
+                <div>{d.label}<small className="block text-[13px] leading-none" style={{ color: locked ? "var(--sl-locked-text)" : "var(--sl-muted)" }}>{locked ? "Locked" : hint}</small></div>
+                <div className="sys-bar" role="progressbar" aria-label={`${d.label} progress to 100`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={locked ? 0 : toward}
+                  title={locked ? undefined : `${v.value} / 100`}
+                  style={locked ? { borderColor: "var(--sl-locked)", ["--c" as string]: "var(--sl-locked)" } : undefined}><i style={{ width: `${locked ? 0 : toward}%`, boxShadow: locked ? "none" : undefined }} /></div>
                 <div className="mono text-right text-[22px]" style={pulse === d.id ? { color: "var(--sl-gold)", textShadow: "0 0 10px var(--sl-gold)" } : undefined}>{v.value}</div>
                 <button disabled={!ready} aria-label={locked ? `${d.label} is locked` : `Allocate point to ${d.label}`} title={locked ? "Locked" : pts > 0 ? "Spend 1 ability point" : "Level up to earn ability points"} className={`plus-btn ${ready ? "ready" : ""}`}
                   onClick={() => { dispatch({ type: "POINTS_ALLOCATED", stat: d.id, points: 1 }); setPulse(d.id); playSound("ding"); }}>

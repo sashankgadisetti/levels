@@ -40,12 +40,12 @@ describe("time", () => {
 
 describe("xp & rank", () => {
   it("golden curve", () => {
-    expect([1, 2, 3, 4, 5].map((l) => xpToNext(l))).toEqual([30, 74, 125, 182, 243]);
+    expect([1, 2, 3, 4, 5].map((l) => xpToNext(l))).toEqual([80, 219, 393, 597, 825]);
   });
   it("multi-level-up carries overflow and grants points", () => {
-    const g = applyXp(1, 0, 30 + 74 + 50, DEFAULT_CONFIG.curves);
-    expect(g).toMatchObject({ level: 3, xp: 50, levelsGained: 2, pointsGained: 6 });
-    expect(applyXp(1, 29, 1, DEFAULT_CONFIG.curves)).toMatchObject({ level: 2, xp: 0 });
+    const g = applyXp(1, 0, 80 + 219 + 50, DEFAULT_CONFIG.curves);
+    expect(g).toMatchObject({ level: 3, xp: 50, levelsGained: 2, pointsGained: 2 });
+    expect(applyXp(1, 79, 1, DEFAULT_CONFIG.curves)).toMatchObject({ level: 2, xp: 0 });
   });
   it("ranks", () => {
     expect([1, 9, 10, 19, 20, 34, 35, 49, 50, 69, 70, 99, 100, 150].map(rankForLevel)).toEqual(

@@ -55,7 +55,7 @@ describe("immediate full-clear reward", () => {
     expect(r.s.today).toMatchObject({ rewardedAt: T(MON, "13:00"), result: "clear", xpEarned: 240, goldEarned: 90 });
     expect(r.s.boxes).toBe(1);
     expect(r.s.gold).toBe(90);
-    expect(r.s.player).toMatchObject({ xp: 240, abilityPoints: 1 });
+    expect(r.s.player).toMatchObject({ xp: 240, abilityPoints: 0 });
     expect(popups(r.fx.slice(n)).map((p) => p.title)[0]).toBe("DAILY QUEST COMPLETE");
     // no clawback / un-clearing
     r = feed(r, { type: "GOAL_SET", goalId: goals[3].id, value: 0, at: T(MON, "13:05") }, { type: "GOAL_PROGRESS", goalId: goals[0].id, delta: -5, at: T(MON, "13:06") });
@@ -65,7 +65,7 @@ describe("immediate full-clear reward", () => {
     r = nextDay(r);
     expect(r.s.gold).toBe(90);
     expect(r.s.boxes).toBe(1);
-    expect(r.s.player).toMatchObject({ xp: 240, abilityPoints: 1 });
+    expect(r.s.player).toMatchObject({ xp: 240, abilityPoints: 0 });
     expect(lastResult(r.s)).toMatchObject({ result: "clear", xpEarned: 240, goldEarned: 90 });
     expect(r.s.streaks.STR.current).toBe(1);
     expect(titles(r.fx.slice(m))).not.toContain("DAILY QUEST COMPLETE");
@@ -83,14 +83,14 @@ describe("immediate full-clear reward", () => {
 });
 
 describe("day close", () => {
-  it("clear: bonus, box, point, level-up ceremony order", () => {
+  it("clear: bonus, box, level-up ceremony order (no ability point for the clear)", () => {
     let r = complete(started(), "all", T(MON, "12:00"));
     r = nextDay(r);
     expect(lastResult(r.s)).toMatchObject({ date: MON, result: "clear", xpEarned: 240, goldEarned: 90 });
     expect(r.s.boxes).toBe(1);
     const g = applyXp(1, 0, 240, DEFAULT_CONFIG.curves);
     expect(g.levelsGained).toBeGreaterThan(0);
-    expect(r.s.player).toMatchObject({ level: g.level, xp: g.xp, abilityPoints: g.pointsGained + 1 });
+    expect(r.s.player).toMatchObject({ level: g.level, xp: g.xp, abilityPoints: g.pointsGained });
     expect(r.s.gold).toBe(90);
     expect(r.s.streaks.STR.current).toBe(1);
     expect(r.s.today!.date).toBe("2026-11-03");
@@ -249,11 +249,12 @@ describe("day close", () => {
   it("points allocation, title equip, config change", () => {
     let r = nextDay(complete(started(), "all", T(MON, "12:00")));
     const ap0 = r.s.player.abilityPoints;
-    r = feed(r, { type: "POINTS_ALLOCATED", stat: "STR", points: 3, at: T("2026-11-03", "09:00") });
-    expect(r.s.stats.STR.allocated).toBe(3);
-    expect(r.s.player.abilityPoints).toBe(ap0 - 3);
+    expect(ap0).toBeGreaterThan(0);
+    r = feed(r, { type: "POINTS_ALLOCATED", stat: "STR", points: ap0, at: T("2026-11-03", "09:00") });
+    expect(r.s.stats.STR.allocated).toBe(ap0);
+    expect(r.s.player.abilityPoints).toBe(0);
     r = feed(r, { type: "POINTS_ALLOCATED", stat: "STR", points: 500, at: T("2026-11-03", "09:01") }, { type: "POINTS_ALLOCATED", stat: "AGI", points: 1, at: T("2026-11-03", "09:02") });
-    expect(r.s.player.abilityPoints).toBe(ap0 - 3);
+    expect(r.s.player.abilityPoints).toBe(0);
     expect(r.s.player.equippedTitleId).toBe("awakened");
     r = feed(r, { type: "CONFIG_CHANGED", patch: { economy: { ...DEFAULT_CONFIG.economy, goldPerGoal: 99 } }, at: T("2026-11-03", "09:03") });
     expect(r.s.config.economy.goldPerGoal).toBe(99);

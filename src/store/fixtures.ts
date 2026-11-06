@@ -1,5 +1,5 @@
 /** Hand-built State used for visual development, tests and `?fixture=` mode. Does not call the engine. */
-import { DEFAULT_CONFIG, type Config, type DailyQuest, type Goal, type HunterRank, type State, type StatId } from "../engine";
+import { DEFAULT_CONFIG, STATE_REV, type Config, type DailyQuest, type Goal, type HunterRank, type State, type StatId } from "../engine";
 
 const iso = (d: Date) => d.toISOString();
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -15,7 +15,7 @@ export function makeFixtureState(opts: { accepted?: boolean; now?: Date; config?
   const now = opts.now ?? new Date();
   const config = opts.config ?? DEFAULT_CONFIG;
   const accepted = opts.accepted ?? true;
-  const stats = { STR: 14, VIT: 12, AGI: 10, INT: 16, SENSE: 11 } satisfies Record<StatId, number>;
+  const stats = { STR: 14, VIT: 12, AGI: 10, INT: 16, SENSE: 11, HYD: 13 } satisfies Record<StatId, number>;
   const mk = (id: StatId) => ({ value: accepted ? stats[id] : 10, xp: 12, allocated: 0 });
   const streak = (stat: StatId, current: number) => ({ stat, current, best: Math.max(current, 9), lastDate: ymd(now) });
 
@@ -27,15 +27,15 @@ export function makeFixtureState(opts: { accepted?: boolean; now?: Date; config?
   });
 
   return {
-    version: 1,
+    version: 1, rev: STATE_REV,
     config,
     player: { accepted, name: accepted ? "JINWOO" : "", level: accepted ? 6 : 1, xp: 148, xpToNext: 260, abilityPoints: accepted ? 3 : 0, job: accepted ? "NONE" : undefined, rank: "E" as HunterRank },
-    stats: { STR: mk("STR"), VIT: mk("VIT"), AGI: mk("AGI"), INT: mk("INT"), SENSE: mk("SENSE") },
+    stats: { STR: mk("STR"), VIT: mk("VIT"), AGI: mk("AGI"), INT: mk("INT"), SENSE: mk("SENSE"), HYD: mk("HYD") },
     vitals: { hp: 178, mp: 66, fatigue: 20 },
     gold: 245,
     today: accepted ? { date: ymd(now), goals: goalsFor(config, { gym: 1, study: 25 }), startedAt: iso(now) } : undefined,
     history: accepted ? history : [],
-    streaks: { STR: streak("STR", 4), VIT: streak("VIT", 12), AGI: streak("AGI", 0), INT: streak("INT", 7), SENSE: streak("SENSE", 3) },
+    streaks: { STR: streak("STR", 4), VIT: streak("VIT", 12), AGI: streak("AGI", 0), INT: streak("INT", 7), SENSE: streak("SENSE", 3), HYD: streak("HYD", 5) },
     inventory: accepted ? [
       { id: "i1", defId: "potion", name: "Potion of Recovery", rarity: "common", description: "Restores 50 HP.", consumable: true, obtainedAt: iso(now) },
       { id: "i2", defId: "xp-boost", name: "XP Boost", rarity: "rare", description: "+25% XP for 24 hours.", consumable: true, obtainedAt: iso(now) },

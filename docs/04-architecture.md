@@ -121,8 +121,10 @@ export const DEFAULT_CONFIG: Config = {
     { id: "study", stat: "INT",   label: "Study for career",   kind: "minutes",  target: 60, unit: "min" },
     { id: "sleep", stat: "SENSE", label: "Sleep",              kind: "hours",    target: 7,  unit: "h", logPrevNight: true },
     { id: "eat",   stat: "VIT",   label: "Clean meals",        kind: "count",    target: 3,  unit: "meals" },
+    { id: "water", stat: "HYD",   label: "Drink water",        kind: "count",    target: 5,  unit: "check-ins",
+      checkIn: { everyMinutes: 90, from: "09:00", to: "21:00" } },   // yes/no pop-up every 90 min until met
   ],
-  curves: { xpPerGoal: 30, fullClearBonus: 120, levelExponent: 1.3, levelBase: 30, pointsPerLevel: 3 },
+  curves: { xpPerGoal: 30, fullClearBonus: 120, levelExponent: 1.45, levelBase: 80, pointsPerLevel: 1, statPointsPerGoal: 1, statBonusEvery: 7 },
   economy: { goldPerGoal: 10, goldFullClear: 50, goldGate: 300, monthlyBudgetUsd: 150, usdToGold: 20 },
   penalty: { surviveHours: 4, hpLoss: 20, lockShop: true, resetStreakOf: "missedStatsOnly" },
   oracle: { enabled: false, model: "claude-opus-5-5", flavorModel: "claude-haiku-5-5", dailyBudgetUsd: 0.25 },
@@ -135,10 +137,11 @@ Player levels up, `target` for numeric habits can grow by the habit's
 
 ## 5. Numbers
 
-- **Player XP to reach level L+1:** `round(levelBase · L^levelExponent)` → 30, 74, 125, 182, 243, … Cumulative XP to reach Lv 40 ≈ 61 000, i.e. about 8–9 months of near-perfect days at 240 XP/day, so the Job Change lands where it should; Lv 100 is a multi-year goal.
+- **Player XP to reach level L+1:** `round(levelBase · L^levelExponent)` → 80, 219, 393, 597, 825, … At a full clear every day (~270 XP) the Player is Lv 2 after day 1, ~Lv 10 after a month, ~Lv 15 after 3 months and mid-20s after a year.
+- **Ability points:** `pointsPerLevel` (1) per level-up only; a full clear no longer grants one.
 - **XP sources:** each goal `xpPerGoal × difficulty` (difficulty 1.0 for a base target, scales with how far above base the target is); full clear `fullClearBonus`; Instant Dungeon `rank × 40`; Gate `400`.
-- **Stat value:** `10 + floor(statXp / 100) + allocatedPoints`. Stat XP = the XP of goals mapped to that stat. So the four areas visibly diverge based on what you actually do.
-- **HP (0–100):** starts 100; `+10` per VIT/SENSE goal (cap 100); `−20` for a penalty; `−5` per missed VIT/SENSE goal at day close. Below 30 the status window shows it red and the Oracle gets "low HP" context.
+- **Stat value:** `10 + floor(statXp / 100) + allocatedPoints`. Each completed goal credits its stat `statPointsPerGoal` (1) point (100 stat XP) the moment it is logged, +1 more when that day is a multiple of `statBonusEvery` (7) in the stat's streak; rest days pay half. One habit done daily takes its stat from 10 to 100 in about 11 weeks. Stats: STR, VIT, AGI, INT, SENSE and HYD (HYDRATION, fed by the water check-ins). Saves made before HYD existed are upgraded by `engine/migrate.ts`.
+- **HP (0–100):** starts 100; `+10` per VIT/SENSE/HYD goal (cap 100); `−20` for a penalty; `−5` per missed VIT/SENSE/HYD goal at day close. Below 30 the status window shows it red and the Oracle gets "low HP" context.
 - **MP (0–100):** `+15` per SENSE goal, `+10` per INT goal; spent by active skills.
 - **Fatigue (0–100):** `+25` per STR goal on consecutive days, `−40` on a rest day; at ≥75 the daily quest marks the gym goal "Rest recommended" and completing a rest day counts as the STR goal.
 - **Gold:** `goldPerGoal` per goal, `goldFullClear` on a full clear, shadows yield `rank × 2` per day, Gate `goldGate`. Gold is never purchasable.

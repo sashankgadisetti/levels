@@ -6,7 +6,7 @@ import type { SystemWindowSpec } from "../system/spec";
 
 export type ISO = string;        // ISO-8601 timestamp
 export type YMD = string;        // "2026-11-04" in the player's local day (see dayEndsAt)
-export type StatId = "STR" | "VIT" | "AGI" | "INT" | "SENSE";
+export type StatId = "STR" | "VIT" | "AGI" | "INT" | "SENSE" | "HYD";
 export type HunterRank = "E" | "D" | "C" | "B" | "A" | "S" | "NATIONAL";
 export type ShadowRank = "Normal Soldier" | "Elite Knight" | "Knight" | "Commander" | "Marshal" | "Grand Marshal";
 export type Rarity = "common" | "rare" | "epic" | "legendary";
@@ -30,14 +30,20 @@ export interface Config {
   player: { name: string; dayEndsAt: string /* "HH:MM" */; timezone?: string };
   stats: StatDef[];
   habits: HabitDef[];
-  curves: { xpPerGoal: number; fullClearBonus: number; levelExponent: number; levelBase: number; pointsPerLevel: number };
+  curves: {
+    xpPerGoal: number; fullClearBonus: number; levelExponent: number; levelBase: number; pointsPerLevel: number;
+    /** Stat points a completed goal adds to its stat (default 1). */
+    statPointsPerGoal?: number;
+    /** Every Nth consecutive day of a stat's streak, its goals pay one extra stat point (default 7; 0 = off). */
+    statBonusEvery?: number;
+  };
   economy: { goldPerGoal: number; goldFullClear: number; goldGate: number; monthlyBudgetUsd: number; usdToGold: number };
   penalty: { surviveHours: number; hpLoss: number; lockShop: boolean; resetStreakOf: "missedStatsOnly" | "all" | "none" };
   popups: { warnHoursBefore: number[]; quietHours?: { from: string; to: string } };
   oracle: { enabled: boolean; model: string; flavorModel: string; dailyBudgetUsd: number };
 }
 
-export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */; mode?: "yesno" /* logged one yes at a time, no amounts */ }
+export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */; mode?: "yesno" /* logged one yes at a time, no amounts */; statPaid?: number /* stat points already credited for this goal */ }
 export interface DailyQuest { date: YMD; goals: Goal[]; startedAt: ISO; closedAt?: ISO; rewardedAt?: ISO /* full-clear rewards paid at this time */; result?: "clear" | "partial" | "fail"; xpEarned?: number; goldEarned?: number }
 
 export interface Item { id: string; defId: string; name: string; rarity: Rarity; description: string; consumable: boolean; obtainedAt: ISO }
@@ -57,6 +63,8 @@ export interface PendingExtraction { stat: StatId; milestone: number; offeredAt:
 
 export interface State {
   version: 1;
+  /** Save-format revision; `migrate` upgrades older snapshots (absent = 1). */
+  rev?: number;
   config: Config;
   player: { accepted: boolean; name: string; level: number; xp: number; xpToNext: number; abilityPoints: number; job?: string; equippedTitleId?: string; rank: HunterRank };
   stats: Record<StatId, { value: number; xp: number; allocated: number }>;
