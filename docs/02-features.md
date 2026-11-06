@@ -77,10 +77,10 @@ Every morning the System issues a Daily Quest with four goals, one per stat. The
   - Fatigue never triggers a penalty by itself.
 
 #### Ability points allocation [MVP]
-- **Description:** 3 points per level (canon). Spend on any unlocked stat; +1 permanent point equals +1 to stat base.
+- **Description:** 1 point per level (slowed from canon's 3 so stats stay earned by habits). Spend on any unlocked stat; +1 permanent point equals +1 to stat base.
 - **Acceptance criteria:**
   - Allocation UI is `[+]` buttons with an Apply/Reset-before-apply pattern; applying is irreversible except via a rare "Stat Reset Scroll".
-  - Daily Quest clears add a *habit stat gain* (+1 to the matching stat on the 7th clear of that goal in a rolling 7 days, max +1 per stat per week); this is separate from level points.
+  - Each completed goal adds +1 to its stat (+2 on every 7th day in a row of that stat's streak); this is separate from level points. A stat reaches 100 after about 11 weeks of daily consistency.
   - Points banked are shown in a red pulse badge on Status until spent.
 
 #### Job change at Lv 40 [V1]
@@ -132,6 +132,7 @@ Every morning the System issues a Daily Quest with four goals, one per stat. The
   - Max 3 declared rest days/week; the 4th consecutive rest day is flagged by the System ("[Rest is a decision. Four in a row is a drift.]").
   - A rest day never breaks the STR streak.
   - "Ad-hoc rest day" button is available once per week without a Tenacity charge when Fatigue >= 60.
+  - **Implemented:** a **Rest day** button on any Daily Quest goal whose habit has rest days. A habit gets as many rests per ISO week as it has `restDays` (the workout: 1). Taking one early uses the week's allowance, so the scheduled day becomes a normal day. At Fatigue >= 75 the STR goal can rest beyond the allowance. A rest pays half XP, gold and stat points and keeps the streak; **Undo** works until the day's rewards are paid. Engine: `GOAL_RESTED` / `GOAL_REST_UNDONE`, `src/engine/rest.ts`.
 
 #### Urgent Quests [V1]
 - **Description:** Surprise same-day mini-quests (e.g. "Walk 20 minutes before 18:00", "Drink 500 ml of water now", "Read 10 pages"), 1-2 per week by default, opt-in, 30-180 min timers.
@@ -176,7 +177,7 @@ Design goal: the penalty must sting enough to matter, take under ~4 hours of one
 #### Triggers [MVP] — as shipped in `src/engine/penalty.ts`
 | Day result at the boundary | Rule | Consequence |
 |---|---|---|
-| **Clear** — every non-rest goal done | Rewards are paid **immediately** when the last goal is logged (XP + full-clear bonus, gold, Random Box, +1 ability point, level-ups) | Streaks +1 |
+| **Clear** — every non-rest goal done | Rewards are paid **immediately** when the last goal is logged (XP + full-clear bonus, gold, Random Box, level-ups) | Streaks +1 |
 | **Partial** — 2–3 of 4 done | XP/gold for done goals, no bonus | Streaks of the missed stats break (a Streak Shield is consumed first; Tenacity forgives one miss per week); −5 HP per missed VIT/SENSE goal |
 | **Fail** — 0–1 of 4 done, *or* a partial day right after a partial/fail day | Penalty Mode | `[PENALTY QUEST: SURVIVE]` with a 4-hour timer, −20 HP, shop locked, streaks of missed stats break |
 | Quiet hours / Stealth active | Pop-ups are held, the rule still applies | — |

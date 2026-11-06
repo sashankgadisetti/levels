@@ -7,7 +7,7 @@ export const NOW = new Date(2026, 10, 4, 9, 30); // Wed 2026-11-04 local
 
 export function makeState(over: Partial<State> = {}): State {
   const cfg = { ...DEFAULT_CONFIG, oracle: { ...DEFAULT_CONFIG.oracle, enabled: true } };
-  const ids: StatId[] = ["STR", "VIT", "AGI", "INT", "SENSE"];
+  const ids: StatId[] = ["STR", "VIT", "AGI", "INT", "SENSE", "HYD"];
   const stats = Object.fromEntries(ids.map((i) => [i, { value: 10, xp: 0, allocated: 0 }])) as State["stats"];
   const streaks = Object.fromEntries(ids.map((i) => [i, { stat: i, current: 3, best: 5 }])) as State["streaks"];
   return {

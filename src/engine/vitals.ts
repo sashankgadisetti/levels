@@ -10,9 +10,9 @@ export const restRecommended = (s: State) => s.vitals.fatigue >= FATIGUE_REST_TH
 /** HP/MP effects of completing a goal (applied at day close). */
 export function goalVitals(stat: string): { hp: number; mp: number } {
   return {
-    hp: stat === "VIT" || stat === "SENSE" ? 10 : 0,
+    hp: stat === "VIT" || stat === "SENSE" || stat === "HYD" ? 10 : 0,
     mp: stat === "SENSE" ? 15 : stat === "INT" ? 10 : 0,
   };
 }
 export const MISSED_HP_LOSS = 5;
-export const missedHpLoss = (stat: string) => (stat === "VIT" || stat === "SENSE" ? MISSED_HP_LOSS : 0);
+export const missedHpLoss = (stat: string) => (stat === "VIT" || stat === "SENSE" || stat === "HYD" ? MISSED_HP_LOSS : 0);

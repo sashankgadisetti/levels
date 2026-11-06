@@ -57,8 +57,9 @@ describe("simulate 400 days", () => {
     // every popup validates
     for (const e of fx) if (e.kind === "popup") expect(parseSpec(e.spec).success).toBe(true);
     expect(s.history.length).toBe(400);
-    // NOTE: with the documented curve + 240 XP/day the Player reaches ~Lv 22-24 in 400 days (see report).
-    expect(s.player.level).toBeGreaterThanOrEqual(35);
+    // Slow curve (levelBase 80, exponent 1.45): ~Lv 15 at 3 months, mid-20s after 400 days.
+    expect(s.player.level).toBeGreaterThanOrEqual(20);
+    expect(s.player.level).toBeLessThanOrEqual(35);
     expect(rankIndex(s.player.rank)).toBeGreaterThanOrEqual(2);
     expect(s.stats.STR.value).toBeGreaterThan(10);
     expect(replay(DEFAULT_CONFIG, events)).toEqual(s);

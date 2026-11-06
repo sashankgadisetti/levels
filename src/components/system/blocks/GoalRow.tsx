@@ -11,9 +11,12 @@ const HOUR_CHIPS = [6, 7, 8, 9];
 interface Props extends BlockProps<"goalRow"> {
   /** Sleep habits are logged in the morning for the night before. Falls back to a "sleep" label heuristic. */
   prevNight?: boolean;
+  /** Daily Quest screen only: show a Rest day button that calls this. `restTitle` explains what it uses up. */
+  onRest?: () => void;
+  restTitle?: string;
 }
 
-export function GoalRow({ block, onAction, prevNight }: Props) {
+export function GoalRow({ block, onAction, prevNight, onRest, restTitle }: Props) {
   const [cur, setCur] = useState(block.current);
   const [draft, setDraft] = useState("");
   const [bump, setBump] = useState(0);
@@ -84,6 +87,7 @@ export function GoalRow({ block, onAction, prevNight }: Props) {
           {kind === "hours" && HOUR_CHIPS.map((h) => <button key={h} className="qbtn" onClick={() => setTo(h)} aria-label={`Log ${h} hours for ${label}`}>{h}h</button>)}
           {kind === "count" && <button className="qbtn" onClick={() => add(1)} aria-label={`Add one to ${label}`}>+1</button>}
           <button className="qbtn done-btn" onClick={() => complete()} title="Mark complete" aria-label={`Mark ${label} complete`}>Done</button>
+          {onRest && <button className="qbtn rest-btn" onClick={onRest} title={restTitle} aria-label={`Take a rest day for ${label}`}>Rest day</button>}
           <span className="grow" />
           {logged && <span className="logged" role="status">{logged}</span>}
           <input

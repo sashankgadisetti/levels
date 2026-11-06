@@ -13,7 +13,7 @@ export function make(input: SystemWindowInput): SystemWindowSpec {
   return { variant: "info", title: clip(String(input.title || "NOTIFICATION"), 80), blocks: [], actions: [], sound: "ding" };
 }
 
-const STAT_LABEL: Record<string, string> = { STR: "STRENGTH", VIT: "VITALITY", AGI: "AGILITY", INT: "INTELLIGENCE", SENSE: "SENSE" };
+const STAT_LABEL: Record<string, string> = { STR: "STRENGTH", VIT: "VITALITY", AGI: "AGILITY", INT: "INTELLIGENCE", SENSE: "SENSE", HYD: "HYDRATION" };
 const statLabel = (s: string) => STAT_LABEL[s] ?? s;
 const close = { label: "CLOSE", kind: "dismiss" as const };
 
@@ -57,7 +57,10 @@ export function questComplete(result: DailyQuest, r: QuestRewards): SystemWindow
   if (res === "clear") blocks.push({ type: "text", text: r.tenacity ? "All objectives cleared. Tenacity absorbed one miss." : "All objectives cleared.", tone: "cyan" });
   else blocks.push({ type: "text", text: `${done} / ${goals.length} objectives cleared.`, tone: res === "fail" ? "red" : "dim" });
   blocks.push(...goals.slice(0, 8).map(goalRow));
-  blocks.push({ type: "kv", rows: [["REWARD", rewardLine]] });
+  const statGain: Record<string, number> = {};
+  for (const g of goals) if (g.statPaid) statGain[g.stat] = (statGain[g.stat] ?? 0) + g.statPaid;
+  const statLine = Object.entries(statGain).map(([k, v]) => `${k} +${v}`).join("   ");
+  blocks.push({ type: "kv", rows: statLine ? [["REWARD", rewardLine], ["STATS", statLine]] : [["REWARD", rewardLine]] });
   const lines: string[] = [];
   if (r.shielded.length) lines.push(`Streak Shield consumed: ${r.shielded.join(", ")} streak preserved.`);
   if (r.broken.length) lines.push(`Streak broken: ${r.broken.join(", ")}.`);
@@ -74,7 +77,7 @@ export function questComplete(result: DailyQuest, r: QuestRewards): SystemWindow
   });
 }
 
-export function levelUp(level: number, from = level - 1, points = 3): SystemWindowSpec {
+export function levelUp(level: number, from = level - 1, points = 1): SystemWindowSpec {
   return make({
     id: `levelup-${level}`, variant: "levelup", title: "LEVEL UP", glyph: "crown",
     blocks: [

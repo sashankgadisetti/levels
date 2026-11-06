@@ -15,19 +15,21 @@ import { addDays, daysBetween, inQuietHours, isoWeek, localDate, monthOf } from 
 import { titleGoldBonus, titleXpBonus } from "./titles";
 import { checkUnlocks } from "./unlocks";
 import { addHp, addMp, goalVitals, missedHpLoss } from "./vitals";
-import { applyXp, xpToNext } from "./xp";
+import { applyXp, goalStatPoints, STAT_XP_PER_POINT, xpToNext } from "./xp";
+import { migrate, STATE_REV, withHydration } from "./migrate";
+import { canRest, canUndoRest, restsUsed } from "./rest";
 import { hoursUntilDayEnd } from "./selectors";
 import * as W from "./windows";
-import type { Config, Event, HunterRank, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
+import type { Config, Event, Goal, HunterRank, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
 
-const STATS: StatId[] = ["STR", "VIT", "AGI", "INT", "SENSE"];
+const STATS: StatId[] = ["STR", "VIT", "AGI", "INT", "SENSE", "HYD"];
 const HISTORY_CAP = 800;
 
 export function createInitialState(config: Config): State {
   const stats = {} as State["stats"], streaks = {} as State["streaks"];
   for (const id of STATS) { stats[id] = { value: 10, xp: 0, allocated: 0 }; streaks[id] = { stat: id, current: 0, best: 0 }; }
   return {
-    version: 1, config,
+    version: 1, rev: STATE_REV, config,
     player: { accepted: false, name: config.player.name, level: 1, xp: 0, xpToNext: xpToNext(1, config.curves), abilityPoints: 0, rank: "E" },
     stats, vitals: { hp: 100, mp: 50, fatigue: 0 }, gold: 0, history: [], streaks, inventory: [], boxes: 0, rewards: [],
     spentThisMonthUsd: 0, titles: [], skills: [], shadows: [], dungeonsCleared: 0, gatesCleared: 0,
@@ -37,7 +39,12 @@ export function createInitialState(config: Config): State {
 /** Private working copy: everything mutable is copied, `config` and closed history entries are shared. */
 function draft(s: State): State {
   const stats = {} as State["stats"], streaks = {} as State["streaks"];
-  for (const id of STATS) { stats[id] = { ...s.stats[id] }; streaks[id] = { ...s.streaks[id] }; }
+  // Defaults cover stats added after the save was made (e.g. HYD).
+  for (const id of STATS) {
+    const st = s.stats[id] as State["stats"][StatId] | undefined, sk = s.streaks[id] as State["streaks"][StatId] | undefined;
+    stats[id] = st ? { ...st } : { value: 10, xp: 0, allocated: 0 };
+    streaks[id] = sk ? { ...sk } : { stat: id, current: 0, best: 0 };
+  }
   return {
     ...s, player: { ...s.player }, stats, streaks, vitals: { ...s.vitals },
     today: s.today && { ...s.today, goals: s.today.goals.map((g) => ({ ...g })) },
@@ -48,7 +55,22 @@ function draft(s: State): State {
   };
 }
 
-const recalcStat = (s: State, id: StatId) => { s.stats[id].value = 10 + Math.floor(s.stats[id].xp / 100) + s.stats[id].allocated; };
+const recalcStat = (s: State, id: StatId) => { s.stats[id].value = 10 + Math.floor(s.stats[id].xp / STAT_XP_PER_POINT) + s.stats[id].allocated; };
+
+/** The day of `stat`'s streak that `date` becomes if the stat clears today. */
+const streakDayFor = (s: State, stat: StatId, date: YMD) => {
+  const st = s.streaks[stat];
+  return (st.lastDate === addDays(date, -1) ? st.current : 0) + 1;
+};
+/** Credit (or take back) the stat points `g` is worth now, so stats move as goals are logged. */
+function settleStat(s: State, g: Goal, date: YMD): void {
+  const want = goalStatPoints(g, streakDayFor(s, g.stat, date), s.config.curves);
+  const delta = want - (g.statPaid ?? 0);
+  if (!delta) return;
+  s.stats[g.stat].xp = Math.max(0, s.stats[g.stat].xp + delta * STAT_XP_PER_POINT);
+  g.statPaid = want;
+  recalcStat(s, g.stat);
+}
 
 interface LevelInfo { from: number; to: number; points: number; prevRank: HunterRank }
 /** Add XP to the player, handling carry, level-ups, point grants, HP/MP restore and rank. */
@@ -86,7 +108,7 @@ function startDay(c: Ctx, date: YMD): void {
   const last = s.history[s.history.length - 1];
   if (last && last.date >= date) return; // that day is already closed
   if (last && daysBetween(last.date, date) >= 8) s.counters = { ...(s.counters ?? {}), comebackPending: 1 };
-  s.today = buildDailyQuest(s.config, date, s.player.level, c.at);
+  s.today = buildDailyQuest(s.config, date, s.player.level, c.at, (id) => restsUsed(s, id, date));
   s.warned = undefined;
   popup(c, W.dailyQuest(s));
   if (s.config.oracle.enabled) {
@@ -166,19 +188,20 @@ function closeDay(c: Ctx, date: YMD): void {
   for (const o of so.offers) popup(c, W.shadowOffer(o.stat, o.milestone));
 }
 
-/** Pay goal XP/gold/vitals (+ full-clear bonus, box, point when `cleared`) and apply level-ups. Shadow gold is paid at close. */
+/** Pay goal XP/gold/vitals and stat points (+ full-clear bonus and box when `cleared`) and apply level-ups. Shadow gold is paid at close. */
 function payGoals(c: Ctx, q: NonNullable<State["today"]>, cleared: boolean) {
   const s = c.s, cfg = s.config, date = q.date;
   const boost = s.xpBoostFor === date ? 0.5 : 0;
-  let xp = 0, gold = 0, points = 0;
-  const statXp: Partial<Record<StatId, number>> = {};
+  let xp = 0, gold = 0;
+  const points = 0; // ability points now come only from level-ups
   for (const g of q.goals) {
+    settleStat(s, g, date);
     if (!g.done) continue;
     const h = habitOf(cfg, g);
     const diff = h && h.kind !== "check" && h.target > 0 ? Math.max(1, g.target / h.target) : 1;
     const mult = Math.min(3, Math.min(3, 1 + titleXpBonus(s, g.stat) + boost) * (g.xpMult ?? 1));
     const gx = Math.round(cfg.curves.xpPerGoal * diff * (g.rest ? 0.5 : 1) * mult);
-    xp += gx; statXp[g.stat] = (statXp[g.stat] ?? 0) + gx;
+    xp += gx;
     gold += goalGold(s, !!g.rest);
     const v = goalVitals(g.stat);
     addHp(s, v.hp); addMp(s, v.mp);
@@ -186,11 +209,10 @@ function payGoals(c: Ctx, q: NonNullable<State["today"]>, cleared: boolean) {
   if (cleared) {
     xp += Math.round(cfg.curves.fullClearBonus * Math.min(3, 1 + titleXpBonus(s, "ALL") + boost));
     gold += cfg.economy.goldFullClear;
-    s.boxes += 1; points = 1; s.player.abilityPoints += 1;
+    s.boxes += 1;
   }
   gold = Math.round(gold * (1 + titleGoldBonus(s)));
   s.gold += gold;
-  for (const id of Object.keys(statXp) as StatId[]) { s.stats[id].xp += statXp[id]!; recalcStat(s, id); }
   const lvl = awardXp(c, xp);
   return { xp, gold, points, lvl };
 }
@@ -217,10 +239,31 @@ function touchGoal(c: Ctx, goalId: string, fn: (v: number) => number): void {
   if (!g) return;
   const was = g.done;
   setGoalValue(g, s.today!.rewardedAt ? Math.max(g.target, fn(g.current)) : fn(g.current));
+  settleStat(s, g, s.today!.date);
   if (!was && g.done && !g.rest && s.sprintArmed) { g.xpMult = 2; s.sprintArmed = false; }
   else if (was && !g.done && g.xpMult) { delete g.xpMult; s.sprintArmed = true; }
   const q = s.today!;
   if (!q.rewardedAt && isFullClear(q)) rewardClear(c, q);
+}
+
+const REST_SUFFIX = " (rest day)";
+/** Rest day button: the goal counts as a rest (done, half rewards, streak kept) and uses the week's allowance. */
+function restGoal(c: Ctx, goalId: string): void {
+  const s = c.s, q = s.today, g = q?.goals.find((x) => x.id === goalId);
+  if (!q || !g || !canRest(s, g)) return;
+  g.rest = true; g.restManual = true;
+  if (!g.label.endsWith(REST_SUFFIX)) g.label += REST_SUFFIX;
+  setGoalValue(g, g.target);
+  settleStat(s, g, q.date);
+  if (!q.rewardedAt && isFullClear(q)) rewardClear(c, q);
+}
+function undoRest(c: Ctx, goalId: string): void {
+  const s = c.s, q = s.today, g = q?.goals.find((x) => x.id === goalId);
+  if (!q || !g || !canUndoRest(s, g)) return;
+  delete g.rest; delete g.restManual;
+  if (g.label.endsWith(REST_SUFFIX)) g.label = g.label.slice(0, -REST_SUFFIX.length);
+  setGoalValue(g, 0);
+  settleStat(s, g, q.date);
 }
 
 /** Yes/no prompts (e.g. water): ask every `everyMinutes` inside the habit's window until today's goal is met. */
@@ -332,6 +375,8 @@ function apply(c: Ctx, ev: Event): void {
     case "DAY_CLOSED": closeDay(c, ev.date); return;
     case "GOAL_PROGRESS": touchGoal(c, ev.goalId, (v) => v + ev.delta); return;
     case "GOAL_SET": touchGoal(c, ev.goalId, () => ev.value); return;
+    case "GOAL_RESTED": restGoal(c, ev.goalId); return;
+    case "GOAL_REST_UNDONE": undoRest(c, ev.goalId); return;
     case "PENALTY_PROGRESS": progressPenalty(c, ev.goalId, ev.delta); return;
     case "PENALTY_CLEARED": clearPenalty(c, "makeup"); return;
     case "POINTS_ALLOCATED": {
@@ -394,7 +439,7 @@ function apply(c: Ctx, ev: Event): void {
     case "CHECKIN_ANSWERED": answerCheckIn(c, ev.habitId, ev.yes); return;
     case "TICK": tick(c); return;
     case "CONFIG_CHANGED":
-      s.config = { ...s.config, ...ev.patch };
+      s.config = { ...s.config, ...withHydration(ev.patch) };
       s.player.xpToNext = xpToNext(s.player.level, s.config.curves);
       return;
   }
@@ -402,6 +447,7 @@ function apply(c: Ctx, ev: Event): void {
 
 export function reduce(state: State, event: Event): ReduceResult {
   const c: Ctx = { s: draft(state), fx: [], at: event.at };
+  migrate(c.s);
   flushQueued(c);
   monthRoll(c);
   apply(c, event);

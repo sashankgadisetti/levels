@@ -137,10 +137,10 @@ describe("streaks & shadows", () => {
   it("selectors", () => {
     const r = started();
     expect(selectors.todayProgress(r.s)).toMatchObject({ done: 0, total: 4 });
-    expect(selectors.statRows(r.s)).toHaveLength(5);
+    expect(selectors.statRows(r.s)).toHaveLength(6);
     expect(selectors.statRows(r.s).find((x) => x.stat === "AGI")!.locked).toBe(true);
     expect(selectors.streakFor(r.s, "STR").current).toBe(0);
-    expect(selectors.xpToNext(3)).toBe(125);
+    expect(selectors.xpToNext(3)).toBe(393);
     const end = dayBounds(MON, "03:00").end;
     expect(selectors.hoursUntilDayEnd(r.s, new Date(new Date(end).getTime() - 5_400_000).toISOString())).toBeCloseTo(1.5);
     expect(addDays(MON, 1)).toBe("2026-11-03");

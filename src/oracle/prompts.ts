@@ -136,7 +136,7 @@ Requirements:
 - variant "gate", glyph "skull", sound "ding", actions ENTER (accept, primary) and LATER (dismiss). timeoutMs 0.
 - Title "GATE DETECTED" or "<RANK>-RANK GATE" using a rank near the Player's rank (${d.player.rank}).
 - A text block with the boss name (invented, 1 to 3 words, in the register of Igris, Baruka, Kasaka, Tusk) and a one-line theme tied to the Player's weakest stat or longest streak.
-- A kv block with 4 to 5 rows: objective label -> "0 / N UNIT", covering ACROSS the stats (STR, VIT, INT, SENSE; skip locked stats ${J(d.lockedStats)}). Targets must be achievable in 7 days given the habit list; do not exceed 7 per daily-repeatable item.
+- A kv block with 4 to 5 rows: objective label -> "0 / N UNIT", covering ACROSS the stats (STR, VIT, INT, SENSE, HYD; skip locked stats ${J(d.lockedStats)}). Targets must be achievable in 7 days given the habit list; do not exceed 7 per daily-repeatable item.
 - A kv or text line for the reward. Reward gold must not exceed ${caps.goldGate}. Write it as a proposal, e.g. "GOLD +${caps.goldGate}".
 - Footer: "Expires Sunday 23:59." Do not use goalRow blocks (gate objectives are not daily goals).`;
 }
