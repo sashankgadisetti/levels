@@ -1,6 +1,6 @@
 /**
  * Persistence adapters. The event log is the source of truth; a snapshot is a cache.
- *  - Tauri:   @tauri-apps/plugin-sql, sqlite:levels.db  (events + snapshot tables)
+ *  - Tauri:   @tauri-apps/plugin-sql, sqlite:levels.db  (events + snapshot tables). No fallback.
  *  - Browser: localStorage
  */
 import type { Event, State } from "../engine";
@@ -91,15 +91,36 @@ export function createMemoryPersistence(): Persistence & { events: Event[]; snap
   return m;
 }
 
-/** Picks the right adapter for the current runtime. */
-export async function createPersistence(): Promise<Persistence> {
-  if (isTauri()) {
+const loadLevelsDb = async (): Promise<SqlLike> => {
+  const { default: Database } = await import("@tauri-apps/plugin-sql");
+  return Database.load("sqlite:levels.db");
+};
+
+/**
+ * Opens the desktop save (sqlite:levels.db), retrying with a growing delay: a dev-server reload can make
+ * the first attempt fail. Never falls back to another store. The webview's localStorage is a separate,
+ * usually empty save, and loading it would show a brand-new player in place of the real one. If every
+ * attempt fails, this throws, and the app shows its error screen with Retry.
+ */
+export async function openSqlPersistence(
+  load: () => Promise<SqlLike> = loadLevelsDb,
+  { attempts = 4, delayMs = 250 }: { attempts?: number; delayMs?: number } = {},
+): Promise<Persistence> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
     try {
-      const { default: Database } = await import("@tauri-apps/plugin-sql");
-      return await createSqlPersistence(await Database.load("sqlite:levels.db"));
+      return await createSqlPersistence(await load());
     } catch (err) {
-      console.error("[levels] sqlite unavailable, falling back to localStorage", err);
+      last = err;
+      console.error(`[levels] could not open levels.db (attempt ${i + 1}/${attempts})`, err);
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
     }
   }
-  return createLocalStoragePersistence();
+  const why = last instanceof Error ? last.message : String(last);
+  throw new Error(`Could not open your save (levels.db): ${why}. Your data has not been changed. Press Retry, or restart the app.`);
+}
+
+/** Picks the right adapter for the current runtime: sqlite in the desktop app, localStorage in a browser. */
+export async function createPersistence(): Promise<Persistence> {
+  return isTauri() ? openSqlPersistence() : createLocalStoragePersistence();
 }

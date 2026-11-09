@@ -4,7 +4,7 @@ import { makeFixtureState } from "../fixtures";
 import { createGameStore, shouldLog } from "../game";
 import { routeEffects, type EffectDeps } from "../effects";
 import {
-  createLocalStoragePersistence, createMemoryPersistence, createSqlPersistence, LS_EVENTS, LS_SNAPSHOT, type SqlLike,
+  createLocalStoragePersistence, createMemoryPersistence, createSqlPersistence, LS_EVENTS, LS_SNAPSHOT, openSqlPersistence, type SqlLike,
 } from "../persist";
 import type { SystemWindowSpec } from "../../system/spec";
 import { parseSpec } from "../../system/spec";
@@ -131,5 +131,34 @@ describe("persistence adapters", () => {
     expect(calls.at(-1)!.q).toMatch(/ON CONFLICT\(id\)/);
     expect(await p.loadEvents()).toEqual([{ type: "TICK", at: "t" }]);
     expect(((await p.loadSnapshot()) as unknown as { gold: number }).gold).toBe(5);
+  });
+
+  const okDb = (): SqlLike => ({
+    async execute() { return {}; },
+    async select<T>(q: string) { return (q.includes("FROM snapshot") ? [{ state: JSON.stringify({ gold: 7 }) }] : []) as T; },
+  });
+
+  it("desktop save: a failed open is retried, then the real save loads", async () => {
+    let calls = 0;
+    const load = async () => { if (++calls < 3) throw new Error("plugin not ready"); return okDb(); };
+    const p = await openSqlPersistence(load, { attempts: 4, delayMs: 0 });
+    expect(calls).toBe(3);
+    expect(((await p.loadSnapshot()) as unknown as { gold: number }).gold).toBe(7);
+  });
+
+  it("desktop save: when levels.db never opens, init shows an error and never starts a new player", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const load = async (): Promise<SqlLike> => { throw new Error("database is locked"); };
+    await expect(openSqlPersistence(load, { attempts: 2, delayMs: 0 })).rejects.toThrow(/Could not open your save \(levels\.db\): database is locked/);
+    const createInitialState = vi.fn(() => makeFixtureState({ accepted: false }));
+    const store = createGameStore({
+      reduce: (s) => ({ state: s, effects: [] }), createInitialState, replay: () => makeFixtureState(), runEffects: () => {},
+      persistence: () => openSqlPersistence(load, { attempts: 2, delayMs: 0 }),
+    });
+    await store.getState().init();
+    expect(store.getState().state).toBeUndefined();
+    expect(store.getState().error).toMatch(/Your data has not been changed/);
+    expect(createInitialState).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 });
