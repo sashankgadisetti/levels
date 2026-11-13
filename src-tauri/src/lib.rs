@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, LogicalPosition, Manager, WebviewWindow,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewWindow,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -54,24 +54,42 @@ fn open_main(app: AppHandle, screen: Option<String>) -> Result<(), String> {
     app.emit("levels://open-screen", screen).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-fn show_system_window(app: AppHandle, payload: serde_json::Value) -> Result<(), String> {
-    let win = app.get_webview_window("system").ok_or("system window missing")?;
-    // Prefer the monitor under the cursor, then the primary monitor.
+/// Pin the system window to the top-right of the monitor under the cursor (else the primary, else the first).
+fn anchor_top_right(win: &WebviewWindow, size: Option<LogicalSize<f64>>) -> Result<(), String> {
     let monitor = win
         .cursor_position()
         .ok()
         .and_then(|p| win.monitor_from_point(p.x, p.y).ok().flatten())
-        .or_else(|| win.primary_monitor().ok().flatten());
+        .or_else(|| win.primary_monitor().ok().flatten())
+        .or_else(|| win.available_monitors().ok().and_then(|m| m.into_iter().next()));
     if let Some(monitor) = monitor {
         let scale = monitor.scale_factor();
         let mpos = monitor.position().to_logical::<f64>(scale);
         let msize = monitor.size().to_logical::<f64>(scale);
-        let wsize = win.outer_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
+        let wsize = match size {
+            Some(s) => s,
+            None => win.outer_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale),
+        };
         let x = mpos.x + msize.width - wsize.width - MARGIN;
         let y = mpos.y + MARGIN;
         win.set_position(LogicalPosition::new(x, y)).map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+/// Resize the system window to its rendered content and re-anchor it in one step (called by the popup page).
+#[tauri::command]
+fn fit_system_window(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
+    let win = app.get_webview_window("system").ok_or("system window missing")?;
+    let size = LogicalSize::new(width.clamp(360.0, 560.0), height.clamp(160.0, 780.0));
+    win.set_size(size).map_err(|e| e.to_string())?;
+    anchor_top_right(&win, Some(size))
+}
+
+#[tauri::command]
+fn show_system_window(app: AppHandle, payload: serde_json::Value) -> Result<(), String> {
+    let win = app.get_webview_window("system").ok_or("system window missing")?;
+    anchor_top_right(&win, None)?;
     let _ = win.set_always_on_top(true);
     // Show without focusing so we never steal focus from the user's current app.
     win.show().map_err(|e| e.to_string())?;
@@ -134,7 +152,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![show_system_window, hide_system_window, open_main])
+        .invoke_handler(tauri::generate_handler![show_system_window, hide_system_window, fit_system_window, open_main])
         .setup(move |app| {
             // CmdOrCtrl+Shift+S: Cmd on macOS, Ctrl elsewhere.
             let sc = if cfg!(target_os = "macos") { toggle } else { toggle_alt };

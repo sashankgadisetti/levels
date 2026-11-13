@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Levels — System",
+        "title": "Levels \u2014 System",
         "url": "index.html",
         "width": 1100,
         "height": 760,
@@ -27,8 +27,8 @@
         "label": "system",
         "title": "System",
         "url": "system.html",
-        "width": 520,
-        "height": 420,
+        "width": 360,
+        "height": 160,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
@@ -64,7 +64,7 @@
       "icons/icon.ico"
     ],
     "category": "Productivity",
-    "shortDescription": "Levels — a Solo Leveling-style life RPG",
+    "shortDescription": "Levels \u2014 a Solo Leveling-style life RPG",
     "longDescription": "Levels turns your daily habits into a Solo Leveling-style life RPG with floating System pop-up windows, stats, streaks and rewards.",
     "macOS": {
       "minimumSystemVersion": "12.0",

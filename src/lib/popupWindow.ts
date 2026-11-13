@@ -1,8 +1,9 @@
-/** Sizing/anchoring of the always-on-top Tauri "system" window around its rendered content. Never focuses the window. */
-import { isTauri } from "./tauri";
+/** Sizing/anchoring of the always-on-top Tauri "system" window around its rendered content. Never focuses the window.
+ *  The window starts at POPUP_MIN in tauri.conf.json and only grows: GTK will not shrink a non-resizable window below its initial size. */
+import { invoke, isTauri } from "./tauri";
 
 export const POPUP_MIN = { w: 360, h: 160 };
-export const POPUP_MAX = { w: 560, h: 700 };
+export const POPUP_MAX = { w: 560, h: 780 };
 export const POPUP_MARGIN = 24;
 /** Transparent padding around the System window inside the webview (px, each side): room for the glow. */
 export const POPUP_PAD = 12;
@@ -20,6 +21,13 @@ export async function fitSystemWindow(w: number, h: number): Promise<void> {
   const size = clampSize(w, h);
   if (Math.abs(size.w - last.w) < 2 && Math.abs(size.h - last.h) < 2) return;
   last = size;
+  try {
+    // One round trip: Rust resizes and re-anchors on the monitor under the cursor.
+    await invoke("fit_system_window", { width: size.w, height: size.h });
+    return;
+  } catch (err) {
+    console.warn("[system] fit_system_window failed, falling back", err);
+  }
   try {
     const api = await import("@tauri-apps/api/window");
     const win = api.getCurrentWindow();
