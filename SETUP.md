@@ -20,9 +20,9 @@ For a universal binary: `rustup target add aarch64-apple-darwin x86_64-apple-dar
 CI also builds it: see `.github/workflows/build-macos.yml` (manual run or `v*` tag; the `.dmg` is uploaded as an artifact).
 
 ### First launch (Gatekeeper)
-The app is unsigned, so macOS will refuse a plain double-click. Either right-click the app,
-choose **Open**, then **Open** again; or run
-`xattr -dr com.apple.quarantine /Applications/Levels.app`.
+The app is not notarized, so macOS blocks a downloaded copy and offers "Move to Trash". Click
+**Done** instead, then run `xattr -cr /Applications/Levels.app` once and open it again; or go to
+System Settings → Privacy & Security, scroll down and click **Open Anyway**.
 To sign/notarize later, add the repo secrets `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`,
 `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD` (app-specific password) and `APPLE_TEAM_ID`.
 
