@@ -7,7 +7,7 @@ import { bump, count, flushQueued, popup, type Ctx } from "./ctx";
 import { canPurchase, goalGold, rewardGoldPrice } from "./economy";
 import { makeItem, MAX_SHIELDS } from "./items";
 import { clearPenalty, isPenaltyActive, penaltyGoals as penaltyViews, progressPenalty, startPenalty } from "./penalty";
-import { buildDailyQuest, habitOf, isFullClear, setGoalValue } from "./quests";
+import { BACKFILL_DAYS, buildDailyQuest, habitOf, isFullClear, setGoalValue } from "./quests";
 import { rankForLevel, rankIndex } from "./rank";
 import { useSkill } from "./skills";
 import { shadowGold, shadowRankFor, updateStreaks } from "./streaks";
@@ -158,12 +158,8 @@ function closeDay(c: Ctx, date: YMD): void {
       s.lastGymDate = date; bump(s, "gymSessions");
     } else s.vitals.fatigue = Math.max(0, s.vitals.fatigue - 10);
   }
-  for (const g of q.goals) {
-    if (g.stat !== "INT") continue;
-    const kind = habitOf(cfg, g)?.kind;
-    const mins = kind === "hours" ? g.current * 60 : kind === "minutes" ? g.current : 0;
-    if (mins) bump(s, "intMinutes", Math.round(mins));
-  }
+  const mins = intMinutes(cfg, q.goals);
+  if (mins) bump(s, "intMinutes", mins);
 
   // --- streaks ---
   const statClear: Partial<Record<StatId, boolean>> = {};
@@ -226,6 +222,104 @@ function rewardClear(c: Ctx, q: NonNullable<State["today"]>): void {
   popup(c, W.questComplete(q, { xp: pay.xp, gold: pay.gold, box: true, points: pay.points, overallStreak: count(s, "overall") + 1, shielded: [], broken: [], tenacity: false, hpLost: 0 }));
   announceLevel(c, pay.lvl);
   checkUnlocks(c);
+}
+
+const statCleared = (q: DailyQuest, stat: StatId, mode: Config["penalty"]["resetStreakOf"]) => {
+  const goals = q.goals.filter((g) => g.stat === stat);
+  // a "clear" day with a missed goal means Tenacity forgave it
+  return goals.length > 0 && (goals.every((g) => g.done) || q.result === "clear") && !(mode === "all" && q.result !== "clear");
+};
+/** Consecutive days ending at `end` on which `stat` was cleared, read from closed history. */
+function streakRun(s: State, stat: StatId, end: YMD): number {
+  const byDate = new Map(s.history.map((d) => [d.date, d]));
+  let n = 0;
+  for (let d = end; ; d = addDays(d, -1)) {
+    const q = byDate.get(d);
+    if (!q || !statCleared(q, stat, s.config.penalty.resetStreakOf)) return n;
+    n++;
+  }
+}
+const intMinutes = (cfg: Config, goals: Goal[]) => goals.reduce((sum, g) => {
+  if (g.stat !== "INT") return sum;
+  const kind = habitOf(cfg, g)?.kind;
+  return sum + Math.round(kind === "hours" ? g.current * 60 : kind === "minutes" ? g.current : 0);
+}, 0);
+
+/**
+ * Log goals for a day that already ended. The day is created if the app was never opened on it, otherwise
+ * the closed day is amended. Newly completed goals pay their normal rewards, streaks are repaired and a
+ * penalty caused by those goals is lifted. Nothing is ever taken away.
+ */
+function logPastDay(c: Ctx, date: YMD, habitIds: string[]): void {
+  const s = c.s, cfg = s.config;
+  if (!s.player.accepted) return;
+  const cur = localDate(c.at, cfg.player.dayEndsAt);
+  if (date >= (s.today?.date ?? cur) || date >= cur || daysBetween(date, cur) > BACKFILL_DAYS) return;
+
+  let i = s.history.findIndex((d) => d.date === date);
+  const existed = i >= 0;
+  const q: DailyQuest = existed
+    ? { ...s.history[i], goals: s.history[i].goals.map((g) => ({ ...g })) }
+    : { ...buildDailyQuest(cfg, date, s.player.level, undefined, (id) => restsUsed(s, id, date)), closedAt: c.at };
+  const picked = q.goals.filter((g) => !g.done && habitIds.includes(g.habitId));
+  if (!picked.length) return;
+  const wasDone = new Set(existed ? q.goals.filter((g) => g.done).map((g) => g.id) : []);
+  const wasClear = existed && q.result === "clear";
+  const intBefore = existed ? intMinutes(cfg, q.goals) : 0;
+  for (const g of picked) setGoalValue(g, g.target);
+  const fresh = q.goals.filter((g) => g.done && !wasDone.has(g.id));
+
+  if (existed) s.history[i] = q;
+  else {
+    i = s.history.findIndex((d) => d.date > date);
+    if (i < 0) i = s.history.length;
+    s.history.splice(i, 0, q);
+  }
+
+  // --- rewards for the goals that are newly done ---
+  const cleared = isFullClear(q);
+  const pay = payGoals(c, { ...q, goals: fresh }, cleared && !wasClear);
+  let gold = pay.gold;
+  if (!existed) for (const sh of s.shadows) { gold += shadowGold(sh); s.gold += shadowGold(sh); }
+  if (existed) for (const g of fresh) addHp(s, missedHpLoss(g.stat)); // give back what the miss cost
+  const n = q.goals.length, doneN = q.goals.filter((g) => g.done).length;
+  const prev = s.history[i - 1]?.result;
+  q.result = cleared || wasClear ? "clear" : doneN <= Math.floor(n / 4) || prev === "partial" || prev === "fail" ? "fail" : "partial";
+  q.xpEarned = (q.xpEarned ?? 0) + pay.xp; q.goldEarned = (q.goldEarned ?? 0) + gold;
+
+  // --- counters ---
+  if (fresh.some((g) => g.stat === "STR" && !g.rest)) {
+    bump(s, "gymSessions");
+    if (!s.lastGymDate || s.lastGymDate < date) s.lastGymDate = date;
+  }
+  const mins = intMinutes(cfg, q.goals) - intBefore;
+  if (mins > 0) bump(s, "intMinutes", mins);
+
+  // --- streaks ---
+  const step: Partial<Record<StatId, boolean>> = {};
+  for (const stat of new Set(q.goals.map((g) => g.stat))) {
+    const st = s.streaks[stat];
+    if (!st.lastDate || st.lastDate < date) step[stat] = q.goals.every((g) => g.stat !== stat || g.done); // the newest day streaks have seen: a normal close step
+    else { st.current = Math.max(st.current, streakRun(s, stat, st.lastDate)); st.best = Math.max(st.best, st.current); }
+  }
+  const so = updateStreaks(c, date, step, cleared);
+  let overall = 0;
+  for (let k = s.history.length - 1; k >= 0 && s.history[k].result === "clear"; k--) overall++;
+  s.counters = { ...(s.counters ?? {}), overall, bestOverall: Math.max(count(s, "bestOverall"), overall) };
+  if (s.today) for (const g of s.today.goals) settleStat(s, g, s.today.date); // today's streak day may have changed
+
+  // --- penalty: goals that are now done no longer need a makeup ---
+  const p = s.penalty;
+  if (p && !p.cleared) {
+    const left = p.missedGoalIds.filter((id) => !fresh.some((g) => g.id === id));
+    if (left.length === 0) { s.penalty = { ...p, missedGoalIds: left, cleared: true }; addHp(s, cfg.penalty.hpLoss); }
+    else if (left.length !== p.missedGoalIds.length) s.penalty = { ...p, missedGoalIds: left };
+  }
+
+  const lifted = !!p && !p.cleared && !!s.penalty?.cleared;
+  popup(c, W.notice("PAST DAY LOGGED", `${date}: ${doneN}/${n} goals done. XP +${pay.xp}  GOLD +${gold}.${cleared && !wasClear ? " Full clear: random box x1." : ""}${lifted ? " Penalty lifted." : ""}`, "gold"));
+  announceLevel(c, pay.lvl);
+  for (const o of so.offers) popup(c, W.shadowOffer(o.stat, o.milestone));
 }
 
 function finishDay(s: State, q: NonNullable<State["today"]>): void {
@@ -373,6 +467,7 @@ function apply(c: Ctx, ev: Event): void {
       return;
     case "DAY_STARTED": startDay(c, ev.date); return;
     case "DAY_CLOSED": closeDay(c, ev.date); return;
+    case "PAST_DAY_LOGGED": logPastDay(c, ev.date, ev.habitIds); return;
     case "GOAL_PROGRESS": touchGoal(c, ev.goalId, (v) => v + ev.delta); return;
     case "GOAL_SET": touchGoal(c, ev.goalId, () => ev.value); return;
     case "GOAL_RESTED": restGoal(c, ev.goalId); return;

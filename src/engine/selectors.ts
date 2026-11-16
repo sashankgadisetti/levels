@@ -6,7 +6,10 @@ import { TITLE_DEFS } from "./titles";
 import { dayBounds, localDate } from "./time";
 import { xpToNext as xpToNextRaw } from "./xp";
 import { restRecommended as restRec } from "./vitals";
-import type { HunterRank, ISO, RewardDef, Skill, StatId, State, Streak, Title } from "./types";
+import { BACKFILL_DAYS, buildDailyQuest, isFullClear } from "./quests";
+import { restsUsed as restsUsedRaw } from "./rest";
+import { addDays } from "./time";
+import type { DailyQuest, HunterRank, ISO, RewardDef, Skill, StatId, State, Streak, Title } from "./types";
 
 export { rankForLevel, nextRankAt, canPurchase, rewardGoldPrice, penaltyGoals, isPenaltyActive };
 export { canRest, canUndoRest, restsUsed, restAllowance } from "./rest";
@@ -52,3 +55,24 @@ export const nextRank = (s: State): { rank: HunterRank; level: number } | undefi
 export const pendingExtractions = (s: State) => s.pendingExtractions ?? [];
 export const stealthActive = (s: State, now: ISO) => !!s.quietUntil && now < s.quietUntil;
 export const canBuy = (s: State, reward: RewardDef) => canPurchase(reward, s);
+
+/**
+ * Finished days (newest first, up to BACKFILL_DAYS back, or two days for a new player) that still have goals open and can be logged with
+ * PAST_DAY_LOGGED. Days the app was never opened on are previewed as a fresh quest (`recorded: false`).
+ */
+export function pastDays(s: State, now: ISO): { date: string; quest: DailyQuest; recorded: boolean }[] {
+  if (!s.player.accepted) return [];
+  const cur = localDate(now, s.config.player.dayEndsAt);
+  const first = s.today && s.today.date < cur ? s.today.date : cur;
+  const began = s.history[0]?.date ?? s.today?.date ?? cur;
+  const out: { date: string; quest: DailyQuest; recorded: boolean }[] = [];
+  for (let k = 1; k <= BACKFILL_DAYS; k++) {
+    const date = addDays(cur, -k);
+    if (date >= first) continue;
+    if (k > 2 && date < began) break; // before the player's first day: only the last two days are offered
+    const have = s.history.find((d) => d.date === date);
+    const quest = have ?? buildDailyQuest(s.config, date, s.player.level, undefined, (id) => restsUsedRaw(s, id, date));
+    if (quest.goals.length && !isFullClear(quest)) out.push({ date, quest, recorded: !!have });
+  }
+  return out;
+}

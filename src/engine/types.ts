@@ -106,6 +106,8 @@ export type Event =
   | { type: "GOAL_RESTED"; goalId: string; at: ISO }
   | { type: "GOAL_REST_UNDONE"; goalId: string; at: ISO }
   | { type: "DAY_CLOSED"; date: YMD; at: ISO }
+  /** Log goals for a day that already ended (e.g. the app was not open): `habitIds` are marked complete. */
+  | { type: "PAST_DAY_LOGGED"; date: YMD; habitIds: string[]; at: ISO }
   | { type: "PENALTY_PROGRESS"; goalId: string; delta: number; at: ISO }
   | { type: "PENALTY_CLEARED"; at: ISO }
   | { type: "POINTS_ALLOCATED"; stat: StatId; points: number; at: ISO }
