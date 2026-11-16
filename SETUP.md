@@ -46,6 +46,32 @@ each generated window is a short request (typically well under a cent on a small
 ### Updater
 Auto-update is not enabled yet. TODO: add `tauri-plugin-updater` once release signing keys exist (`npm run tauri signer generate`), and a hosted `latest.json`.
 
+## Local API for MCP / automation
+While Levels runs it serves a small HTTP API on **127.0.0.1 only** (loopback; never reachable from the network, no CORS),
+port `41414` by default (the next free port up to 41434 if that one is taken). The MCP server in `mcp/` uses it.
+
+| Method & path | Auth | Response |
+|---|---|---|
+| `GET /v1/health` | none | `{ "ok": true, "app": "levels", "version": "0.1.0" }` |
+| `GET /v1/tools` | Bearer | `ToolDef[]` (see `src/agent/contract.ts`; `[]` until the window has loaded) |
+| `POST /v1/tools/{name}` | Bearer | body = the args object (or `{ "args": {...} }`; empty body = `{}`), max 64 KB → `ToolResult` |
+
+Status codes: `200` with the `ToolResult` (also when `ok:false`), `400` body not a JSON object, `401` missing/wrong token,
+`404` unknown tool, `413` body over 64 KB, `503` main window missing, `504` `{ok:false,error:"app did not respond"}` after 15 s.
+Tool calls run in the main window exactly like UI actions (so System pop-ups and history behave normally).
+
+Discovery files in the app data dir (`~/Library/Application Support/dev.levels.app`, Linux `~/.local/share/dev.levels.app`,
+Windows `%APPDATA%\dev.levels.app`), both mode `0600`:
+- `mcp-token` — random 32-byte hex token, created on first launch. Delete it and restart Levels to rotate.
+- `mcp-port` — the port bound on this launch.
+
+```
+T=$(cat ~/.local/share/dev.levels.app/mcp-token); P=$(cat ~/.local/share/dev.levels.app/mcp-port)
+curl -s localhost:$P/v1/health
+curl -s -H "Authorization: Bearer $T" localhost:$P/v1/tools
+curl -s -X POST -H "Authorization: Bearer $T" -H 'content-type: application/json' -d '{}' localhost:$P/v1/tools/get_status
+```
+
 ## Linux
 - Packages (Debian/Ubuntu): `sudo apt install libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev`
 - Note `bundle.targets` is currently `["dmg","app"]`; change it (e.g. `"all"`) to package for Linux/Windows.
