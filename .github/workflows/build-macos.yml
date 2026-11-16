@@ -33,6 +33,13 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           args: --target universal-apple-darwin
+          # On a v* tag: create a GitHub Release and attach the .dmg (pre-release while unsigned).
+          # On a manual run (no tag): just build and upload the artifact below.
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: "Levels v__VERSION__"
+          releaseBody: "Solo Leveling–style life RPG for macOS. Unsigned build: on first launch right-click the app and choose Open, or run `xattr -dr com.apple.quarantine /Applications/Levels.app`. Install by dragging Levels.app into Applications."
+          releaseDraft: false
+          prerelease: true
       - uses: actions/upload-artifact@v4
         with:
           name: levels-macos-dmg
