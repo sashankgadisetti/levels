@@ -34,6 +34,15 @@ export function DailyQuest() {
             <span className="tone-red">Do half of each missed goal today to escape; progress on those goals counts automatically.</span>
             <PenaltyTimer endsAt={s.penalty.endsAt} />
           </div>
+          <ul className="mt-3 grid gap-1 list-none p-0 m-0" aria-label="Penalty makeup progress">
+            {selectors.penaltyGoals(s).map((v) => (
+              <li key={v.goalId} className="flex items-center justify-between gap-3 text-[16px]">
+                <span className={v.done ? "tone-dim line-through" : "tone-text"}>{v.done ? "✓ " : "☐ "}{v.label} <span className="sub">({v.stat})</span></span>
+                <span className={`mono ${v.done ? "tone-gold" : "tone-red"}`}>{v.current}/{v.target} {v.unit}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="sub mt-2 mb-0 normal-case">Makeup targets are half of each goal you missed. Log the same habits in today's quest below.</p>
         </Panel>
       )}
       <Panel title="Daily Quest: Preparation to Become Powerful" accent={cleared ? "gold" : undefined}
