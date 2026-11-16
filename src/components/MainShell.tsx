@@ -118,7 +118,7 @@ export function MainShell() {
             </div>
           </header>
           {state.penalty && !state.penalty.cleared && (
-            <div className="relative z-10 border-b border-[var(--sl-red)] bg-[rgba(255,59,92,.12)] py-1 text-center text-[15px] tone-red">&#9888; Penalty active: clear a missed goal to survive</div>
+            <div className="relative z-10 border-b border-[var(--sl-red)] bg-[rgba(255,59,92,.12)] py-1 text-center text-[15px] tone-red">&#9888; Penalty active: do half of each missed goal today to escape</div>
           )}
           <div className="relative z-10 flex min-h-0 flex-1">
             <nav className="flex w-56 flex-none flex-col gap-1 border-r border-[rgba(63,216,255,.2)] bg-[rgba(2,6,13,.55)] p-3" aria-label="Screens">

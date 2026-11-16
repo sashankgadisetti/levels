@@ -21,11 +21,19 @@ export function findGoal(s: State, id: string): Goal | undefined {
 export function penaltyGoals(s: State): PenaltyGoalView[] {
   const p = s.penalty;
   if (!p) return [];
-  const out: PenaltyGoalView[] = [];
+  // One row per habit: several failed days in a row must not stack the same habit several times.
+  // The most recent missed goal of a habit defines the row; its credit is the best across all of that habit's ids.
+  const byHabit = new Map<string, { id: string; g: Goal; credit: number }>();
   for (const id of p.missedGoalIds) {
     const g = findGoal(s, id);
     if (!g) continue;
-    const target = makeupTarget(g), current = Math.min(target, p.makeup?.[id] ?? 0);
+    const credit = p.makeup?.[id] ?? 0;
+    const prev = byHabit.get(g.habitId);
+    byHabit.set(g.habitId, { id, g, credit: Math.max(credit, prev?.credit ?? 0) }); // later ids win (ids are appended chronologically)
+  }
+  const out: PenaltyGoalView[] = [];
+  for (const { id, g, credit } of byHabit.values()) {
+    const target = makeupTarget(g), current = Math.min(target, credit);
     out.push({ goalId: id, label: g.label, stat: g.stat, unit: g.unit, current, target, done: current >= target });
   }
   return out;
@@ -50,7 +58,13 @@ export function progressPenalty(c: Ctx, goalId: string, delta: number): void {
   if (!p || p.cleared || !p.missedGoalIds.includes(goalId)) return;
   const g = findGoal(s, goalId);
   if (!g) return;
-  p.makeup = { ...(p.makeup ?? {}), [goalId]: Math.max(0, Math.min(makeupTarget(g), (p.makeup?.[goalId] ?? 0) + delta)) };
+  const makeup = { ...(p.makeup ?? {}) };
+  for (const id of p.missedGoalIds) { // all missed days of this habit advance together
+    const other = findGoal(s, id);
+    if (!other || other.habitId !== g.habitId) continue;
+    makeup[id] = Math.max(0, Math.min(makeupTarget(other), (makeup[id] ?? 0) + delta));
+  }
+  p.makeup = makeup;
   if (makeupComplete(s)) clearPenalty(c, "makeup");
 }
 

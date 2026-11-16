@@ -174,6 +174,16 @@ describe("day close", () => {
     r = feed(r, { type: "TICK", at: T("2026-11-03", "10:00") });
     expect(r.s.penalty!.cleared).toBe(true);
   });
+  it("consecutive failed days do not duplicate makeup rows; one row per habit", () => {
+    let r = nextDay(started());           // Mon failed
+    r = nextDay(r);                       // Tue failed too → penalty merged
+    const views = selectors.penaltyGoals(r.s);
+    expect(views.map((v) => v.label)).toEqual([...new Set(views.map((v) => v.label))]);
+    expect(views).toHaveLength(r.s.today!.goals.length);
+    const today = r.s.today!;
+    for (const g of today.goals) r = feed(r, { type: "GOAL_SET", goalId: g.id, value: Math.ceil(g.target / 2), at: T("2026-11-04", "12:00") });
+    expect(r.s.penalty!.cleared).toBe(true);
+  });
   it("penalty reminder after expiry, at most once per day", () => {
     let r = nextDay(started());
     const n0 = popups(r.fx).length;

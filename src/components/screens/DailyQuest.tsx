@@ -118,7 +118,9 @@ function restTitle(s: State, g: Goal): string {
 
 function PenaltyTimer({ endsAt }: { endsAt: string }) {
   const now = useNow();
-  return <span className="mono tone-red text-[28px]" style={{ textShadow: "0 0 14px var(--sl-red)" }}>{fmtHMS((Date.parse(endsAt) - now.getTime()) / 1000)}</span>;
+  const left = (Date.parse(endsAt) - now.getTime()) / 1000;
+  if (left <= 0) return <span className="mono tone-red text-[20px]" style={{ textShadow: "0 0 14px var(--sl-red)" }} title="The timer ran out; the makeup is still required to escape.">TIMER EXPIRED</span>;
+  return <span className="mono tone-red text-[28px]" style={{ textShadow: "0 0 14px var(--sl-red)" }}>{fmtHMS(left)}</span>;
 }
 
 /** Log goals for days that already ended (the app was closed, or a goal was done but never ticked off). */
