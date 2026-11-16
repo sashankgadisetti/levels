@@ -23,7 +23,7 @@ Working today: tray + global shortcuts, the main window (status, quests, rewards
 
 ## Download / Build on macOS
 
-See [SETUP.md](SETUP.md): Xcode CLT + Rust + Node 20, `npm run tauri build`, then open the `.dmg` from `src-tauri/target/release/bundle/` (unsigned: right-click Open on first launch). The `Build macOS` GitHub Action produces the same `.dmg`.
+See [SETUP.md](SETUP.md): Xcode CLT + Rust + Node 20, `npm run tauri build`, then open the `.dmg` from `src-tauri/target/release/bundle/` (not notarized: if macOS says to move it to the Trash, click Done and run `xattr -cr /Applications/Levels.app`, or use System Settings → Privacy & Security → Open Anyway). The `Build macOS` GitHub Action produces the same `.dmg`.
 
 ## How the pop-ups work
 
