@@ -119,6 +119,19 @@ describe("write tools", () => {
     expect((await run("take_rest_day", { habit_id: "study" })).ok).toBe(false);
   });
 
+  it("log_past_day amends yesterday: marks its goals complete and records the day", async () => {
+    const { store } = await setupAgentStore();
+    const r = await run("log_past_day", { days_ago: 1 });
+    expect(r.ok, r.content).toBe(true);
+    expect(r.content).toMatch(/RECORD AMENDED/);
+    const data = r.data as { date: string; done: number; total: number; result?: string };
+    expect(data.done).toBe(data.total);
+    const day = store.getState().state!.history.find((d) => d.date === data.date);
+    expect(day?.goals.every((g) => g.done)).toBe(true);
+    // a second call has nothing left to log
+    expect((await run("log_past_day", { date: data.date })).ok).toBe(false);
+  });
+
   it("propose_targets opens an approval window; ACCEPT applies CONFIG_CHANGED, clamped to ±25% for the agent", async () => {
     const { store, shown } = await setupAgentStore();
     setGameStore(store);

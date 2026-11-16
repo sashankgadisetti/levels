@@ -45,6 +45,7 @@ export const TOOL_NAMES = [
   "complete_goal",     // mark a goal done
   "answer_checkin",    // yes/no habits (water)
   "take_rest_day",     // use a weekly rest on a habit that has rest days
+  "log_past_day",      // amend a day that already ended: mark its goals complete (last 7 days)
   "undo_last_log",     // revert the most recent progress entry made today
   "list_rewards", "add_reward", "buy_reward",
   "ask_system",        // route a question to the Oracle; returns its answer text

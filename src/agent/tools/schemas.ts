@@ -37,6 +37,11 @@ export const SCHEMAS = {
   }),
   take_rest_day: z.strictObject({ ...goalRef }),
   undo_last_log: z.strictObject({}),
+  log_past_day: z.strictObject({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("The past day to amend (YYYY-MM-DD). Default: yesterday. Only days that already ended, within the last 7 days."),
+    days_ago: z.number().int().min(1).max(7).optional().describe("Alternative to date: 1 = yesterday, 2 = the day before."),
+    habit_ids: z.array(z.string()).max(12).optional().describe("Habit ids to mark complete for that day (see get_config / get_today). Default: every goal that was not completed."),
+  }),
   list_rewards: z.strictObject({}),
   add_reward: z.strictObject({
     name: z.string().min(1).max(60).describe("Real-world reward, e.g. \"New headphones\"."),

@@ -4,7 +4,7 @@
  *   source "agent" → plan changes (targets) go through an approval window; logging applies immediately
  *   source "ui"    → applies; log_text without apply opens the confirmation window
  */
-import { selectors, type HabitDef, type State } from "../../engine";
+import { localDate, selectors, type HabitDef, type State } from "../../engine";
 import { uid } from "../../lib/format";
 import type { EventInput } from "../../store/game";
 import type { Block } from "../../system/spec";
@@ -168,6 +168,36 @@ export const WRITE_TOOLS: ToolSpec[] = [
     },
   }),
   defineTool({
+    name: "log_past_day", mutating: true, schema: SCHEMAS.log_past_day,
+    description: "Amend a day that already ended (default yesterday; up to 7 days back): mark the given habits complete for that day, or all of its unfinished goals when habit_ids is omitted. Pays the rewards that day would have paid, repairs streaks and lifts a penalty those goals caused. Use when the player says they did things on a past day but never logged them.",
+    run(args, ctx) {
+      const s = getState(); if (!s) return noState();
+      const nowIso = agentEnv.now().toISOString();
+      const days = selectors.pastDays(s, nowIso);
+      if (!days.length) return fail("No past day is open for amendment (only unfinished days in the last 7 can be logged).");
+      let date = args.date as string | undefined;
+      if (!date) {
+        const back = (args.days_ago as number | undefined) ?? 1;
+        const cur = localDate(nowIso, s.config.player.dayEndsAt);
+        date = days.find((d) => d.date === shiftYmd(cur, -back))?.date ?? (back === 1 ? days[0]?.date : undefined);
+      }
+      const day = days.find((d) => d.date === date);
+      if (!day) return fail(`${date ?? "That day"} cannot be amended: it is not an unfinished day within the last 7 days (open days: ${days.map((d) => d.date).join(", ") || "none"}).`);
+      const open = day.quest.goals.filter((g) => !g.done);
+      const wanted = (args.habit_ids as string[] | undefined)?.length ? open.filter((g) => (args.habit_ids as string[]).includes(g.habitId)) : open;
+      if (!wanted.length) return fail(`Nothing to log for ${date}: ${open.length ? "none of those habits were unfinished" : "every goal was already complete"}.`);
+      dispatch({ type: "PAST_DAY_LOGGED", date: day.date, habitIds: wanted.map((g) => g.habitId) });
+      const after = getState()?.history.find((d) => d.date === day.date);
+      const doneN = after?.goals.filter((g) => g.done).length ?? 0;
+      const total = after?.goals.length ?? day.quest.goals.length;
+      const text = `[RECORD AMENDED] ${day.date}: ${wanted.map((g) => g.label).join(", ")} marked complete → ${doneN}/${total} (${after?.result ?? "clear"}).`;
+      return withWindow(ctx, ok(text, { date: day.date, logged: wanted.map((g) => g.habitId), result: after?.result, done: doneN, total }), () => {
+        agentEnv.show({ variant: "info", glyph: "diamond", title: "RECORD AMENDED", blocks: [{ type: "text", text: clip(`${day.date}: ${wanted.map((g) => g.label).join(", ")} marked complete. ${doneN}/${total} cleared. Streaks repaired.`, 400) }], actions: [{ label: "OK", kind: "dismiss", primary: true }], footer: ctx.source === "mcp" ? MCP_FOOTER : undefined, sound: "ding" });
+        return true;
+      });
+    },
+  }),
+  defineTool({
     name: "undo_last_log", mutating: true, schema: SCHEMAS.undo_last_log,
     description: "Revert the most recent progress entry made through these tools today (log_progress, log_text, complete_goal, check-ins), restoring the goal's previous value. Call repeatedly to step further back.",
     run(_args, ctx) {
@@ -277,3 +307,12 @@ export const WRITE_TOOLS: ToolSpec[] = [
     },
   }),
 ];
+
+
+/** YYYY-MM-DD plus/minus days (local). */
+function shiftYmd(ymd: string, delta: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + delta);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
