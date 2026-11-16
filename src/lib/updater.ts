@@ -14,6 +14,23 @@ const FIRST_CHECK_MS = 15_000;
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
 export type UpdateCheckResult = { status: "up-to-date" | "available" | "error"; version?: string; message?: string };
+export type InstallState = { phase: "idle" | "downloading" | "installing" | "failed"; percent?: number; message?: string };
+let installState: InstallState = { phase: "idle" };
+const listeners = new Set<(s: InstallState) => void>();
+/** Subscribe to install progress (Settings row). Returns an unsubscribe. */
+export function onInstallState(fn: (s: InstallState) => void): () => void { listeners.add(fn); fn(installState); return () => { listeners.delete(fn); }; }
+function setInstallState(s: InstallState): void { installState = s; listeners.forEach((fn) => fn(s)); }
+export const pendingUpdateVersion = (): string | undefined => pending?.version;
+
+function progressWindow(version: string, text: string, failed = false): void {
+  routeEffects([{ kind: "popup", spec: {
+    id: "update-progress", variant: failed ? "warning" : "info", glyph: failed ? "alert" : "diamond",
+    title: failed ? "UPDATE FAILED" : "UPDATING",
+    blocks: [{ type: "text", text: `Levels v${version}: ${text}`.slice(0, 400), tone: failed ? "red" : "cyan" }],
+    actions: failed ? [{ label: "RETRY", kind: "accept", arg: UPDATE_INSTALL_ARG, primary: true }, { label: "CLOSE", kind: "dismiss" }] : [],
+    sound: "none", timeoutMs: failed ? 0 : 0,
+  } }]);
+}
 
 let pending: Update | undefined;
 let installing = false;
@@ -86,18 +103,28 @@ export async function installPendingUpdate(): Promise<void> {
   installing = true;
   try {
     const update = pending ?? (await fetchUpdate());
-    if (!update) { console.info("[updater] no update to install"); return; }
+    if (!update) { console.info("[updater] no update to install"); setInstallState({ phase: "failed", message: "No update found." }); return; }
     let total = 0;
     let done = 0;
+    let lastShown = -1;
+    setInstallState({ phase: "downloading", percent: 0 });
+    progressWindow(update.version, "downloading…");
     await update.downloadAndInstall((e) => {
       if (e.event === "Started") { total = e.data.contentLength ?? 0; console.info(`[updater] downloading v${update.version} (${total || "?"} bytes)`); }
-      else if (e.event === "Progress") { done += e.data.chunkLength; if (total) console.debug(`[updater] ${Math.round((done / total) * 100)}%`); }
-      else if (e.event === "Finished") console.info("[updater] download finished, installing");
+      else if (e.event === "Progress") {
+        done += e.data.chunkLength;
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        setInstallState({ phase: "downloading", percent: pct });
+        if (pct >= lastShown + 10) { lastShown = pct; progressWindow(update.version, `downloading… ${pct}%`); }
+      } else if (e.event === "Finished") { console.info("[updater] download finished, installing"); setInstallState({ phase: "installing" }); progressWindow(update.version, "installing… the app will relaunch."); }
     });
     const { relaunch } = await import("@tauri-apps/plugin-process");
     await relaunch();
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.warn("[updater] install failed", err);
+    setInstallState({ phase: "failed", message });
+    progressWindow(pending?.version ?? "?", `install failed — ${message}. If Levels is running from the .dmg, move it to Applications first.`, true);
   } finally {
     installing = false;
   }

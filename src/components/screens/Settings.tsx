@@ -8,7 +8,7 @@ import { Btn, Field, Panel, SBar, Toggle } from "../ui/kit";
 import { playSound } from "../system/sound";
 import { askTheSystem, lastOracleError, oracleSpentTodayUsd, regenerateToday, testOracle } from "../../oracle/wire";
 import { AgentSettings } from "../agent/AgentSettings";
-import { checkForUpdatesNow, currentAppVersion } from "../../lib/updater";
+import { checkForUpdatesNow, currentAppVersion, installPendingUpdate, onInstallState, type InstallState } from "../../lib/updater";
 
 const DAYS: Weekday[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TABS = [["general", "General"], ["goals", "Goals"], ["popups", "Pop-ups"], ["oracle", "Oracle"], ["agent", "Agent"], ["data", "Data"]] as const;
@@ -319,19 +319,25 @@ function UpdateRow() {
   const [version, setVersion] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState("");
-  useEffect(() => { void currentAppVersion().then(setVersion); }, []);
+  const [available, setAvailable] = useState<string | undefined>();
+  const [install, setInstall] = useState<InstallState>({ phase: "idle" });
+  useEffect(() => { void currentAppVersion().then(setVersion); return onInstallState(setInstall); }, []);
   const run = async () => {
     setBusy(true); setResult("Checking…");
     const r = await checkForUpdatesNow();
     setBusy(false);
-    setResult(r.status === "up-to-date" ? "Up to date." : r.status === "available" ? `v${r.version} available — see the System window.` : `Check failed: ${r.message ?? "unknown error"}`);
+    setAvailable(r.status === "available" ? r.version : undefined);
+    setResult(r.status === "up-to-date" ? "Up to date." : r.status === "available" ? `v${r.version} is available.` : `Check failed: ${r.message ?? "unknown error"}`);
   };
+  const installing = install.phase === "downloading" || install.phase === "installing";
+  const installText = install.phase === "downloading" ? `Downloading… ${install.percent ?? 0}%` : install.phase === "installing" ? "Installing… the app will relaunch." : install.phase === "failed" ? `Install failed: ${install.message ?? "unknown error"}` : "";
   return (
-    <Field label="Updates">
+    <Field label="Updates" hint="Updates install in place and relaunch the app.">
       <div className="flex flex-wrap items-center gap-3">
         {version && <span className="num">v{version} ·</span>}
-        <Btn sm type="button" disabled={busy} onClick={(e) => { e.preventDefault(); void run(); }}>[CHECK FOR UPDATES]</Btn>
-        {result && <span className="tone-dim text-[14px]" role="status">{result}</span>}
+        <Btn sm type="button" disabled={busy || installing} onClick={(e) => { e.preventDefault(); void run(); }}>[CHECK FOR UPDATES]</Btn>
+        {available && <Btn sm primary type="button" disabled={installing} onClick={(e) => { e.preventDefault(); void installPendingUpdate(); }}>[INSTALL v{available} & RELAUNCH]</Btn>}
+        {(installText || result) && <span className={install.phase === "failed" ? "tone-red text-[14px]" : "tone-dim text-[14px]"} role="status">{installText || result}</span>}
       </div>
     </Field>
   );
