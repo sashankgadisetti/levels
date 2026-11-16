@@ -54,6 +54,28 @@ export function progressPenalty(c: Ctx, goalId: string, delta: number): void {
   if (makeupComplete(s)) clearPenalty(c, "makeup");
 }
 
+/**
+ * Credit today's progress on the missed habits to the makeup (idempotent, keeps the larger value).
+ * Runs on every tick so a penalty also clears retroactively when the work was logged earlier.
+ */
+export function syncMakeupFromToday(c: Ctx): void {
+  const s = c.s, p = s.penalty, today = s.today;
+  if (!p || p.cleared || !today) return;
+  let changed = false;
+  const makeup = { ...(p.makeup ?? {}) };
+  for (const id of p.missedGoalIds) {
+    const missed = findGoal(s, id);
+    if (!missed) continue;
+    const todays = today.goals.find((g) => g.habitId === missed.habitId);
+    if (!todays) continue;
+    const credit = Math.min(makeupTarget(missed), todays.current);
+    if (credit > (makeup[id] ?? 0)) { makeup[id] = credit; changed = true; }
+  }
+  if (!changed) return;
+  p.makeup = makeup;
+  if (makeupComplete(s)) clearPenalty(c, "makeup");
+}
+
 export function clearPenalty(c: Ctx, how: "makeup" | "elixir"): void {
   const s = c.s;
   if (!s.penalty || s.penalty.cleared) return;

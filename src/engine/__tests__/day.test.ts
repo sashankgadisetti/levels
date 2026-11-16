@@ -165,6 +165,15 @@ describe("day close", () => {
     expect(r.s.penalty!.cleared).toBe(true);
     expect(titles(r.fx)).toContain("PENALTY CLEARED");
   });
+  it("penalty makeup reconciles from progress already on today's goals (upgrade case)", () => {
+    let r = nextDay(started());
+    expect(r.s.penalty!.cleared).toBe(false);
+    // progress that happened "before the rule existed": set today's goals to their half targets directly
+    r = { ...r, s: structuredClone(r.s) };
+    for (const g of r.s.today!.goals) g.current = Math.ceil(g.target / 2);
+    r = feed(r, { type: "TICK", at: T("2026-11-03", "10:00") });
+    expect(r.s.penalty!.cleared).toBe(true);
+  });
   it("penalty reminder after expiry, at most once per day", () => {
     let r = nextDay(started());
     const n0 = popups(r.fx).length;

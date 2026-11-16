@@ -2334,7 +2334,7 @@ dependencies = [
 
 [[package]]
 name = "levels"
-version = "0.2.1"
+version = "0.2.3"
 dependencies = [
  "axum",
  "rand 0.9.5",

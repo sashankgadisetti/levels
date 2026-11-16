@@ -6,7 +6,7 @@ import { rollBox } from "./boxes";
 import { bump, count, flushQueued, popup, type Ctx } from "./ctx";
 import { canPurchase, goalGold, rewardGoldPrice } from "./economy";
 import { makeItem, MAX_SHIELDS } from "./items";
-import { clearPenalty, isPenaltyActive, penaltyGoals as penaltyViews, progressPenalty, startPenalty } from "./penalty";
+import { clearPenalty, isPenaltyActive, penaltyGoals as penaltyViews, progressPenalty, startPenalty, syncMakeupFromToday } from "./penalty";
 import { BACKFILL_DAYS, buildDailyQuest, habitOf, isFullClear, setGoalValue } from "./quests";
 import { rankForLevel, rankIndex } from "./rank";
 import { useSkill } from "./skills";
@@ -528,6 +528,7 @@ function tick(c: Ctx): void {
     }
   }
   if (q) runCheckIns(c, q);
+  syncMakeupFromToday(c);
   const p = s.penalty;
   if (p && !p.cleared && c.at >= p.endsAt && p.warnedDate !== cur) {
     s.penalty = { ...p, warnedDate: cur };
