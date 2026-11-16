@@ -54,7 +54,37 @@ mkdir -p ~/Library/Application\ Support/dev.levels.app && read -s -p "Anthropic 
 Restart Levels afterwards. Settings → Oracle shows which source the key came from. Delete the file to revoke.
 
 ### Updater
-Auto-update is not enabled yet. TODO: add `tauri-plugin-updater` once release signing keys exist (`npm run tauri signer generate`), and a hosted `latest.json`.
+Levels updates itself from GitHub Releases (`tauri-plugin-updater`). The installed app fetches
+`https://github.com/sashankgadisetti/levels/releases/latest/download/latest.json` 15 s after launch and every 6 h
+(or on demand: **Settings → General → [CHECK FOR UPDATES]**). When a newer signed build exists it shows an
+**UPDATE AVAILABLE** System window; **INSTALL & RELAUNCH** downloads `Levels.app.tar.gz`, verifies its signature
+against the public key in `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`, replaces the app and relaunches.
+A missing `latest.json` (404) is ignored silently; only the Settings button reports check errors.
+
+**One-time key setup (on your Mac):**
+1. Generate a signing keypair (choose a password or leave it empty):
+   `npm run tauri signer generate -- -w ~/.tauri/levels.key`
+   This writes the private key to `~/.tauri/levels.key` and the public key to `~/.tauri/levels.key.pub`.
+   Keep the private key secret and backed up: if you lose it, installed copies can no longer be updated.
+2. Paste the **public** key (contents of `levels.key.pub`) into `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`,
+   replacing the placeholder that is there now (it belongs to a throwaway key), and commit that change.
+3. Add two repository secrets (GitHub → Settings → Secrets and variables → Actions → New repository secret):
+   - `TAURI_SIGNING_PRIVATE_KEY` = the full contents of `~/.tauri/levels.key`
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = its password (may be empty)
+
+   Or with the GitHub CLI:
+   `gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/levels.key` and
+   `gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""` (or your password).
+
+From then on every release built by `.github/workflows/build-macos.yml` (tag `v*` or a manual run with `tag`) is signed and published as a full (not pre-) release, since `releases/latest` skips pre-releases,
+and tauri-action uploads `latest.json` and `Levels.app.tar.gz` + `.sig` next to the `.dmg`. Bump the version in
+`package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` for each release: the updater only offers a higher version.
+Without the secret the workflow still builds (it turns `createUpdaterArtifacts` off) but publishes nothing to update from.
+
+**The first build that contains your real public key must be installed manually once** (from its `.dmg`); builds
+from before that either have no updater or trust a different key. Every later release then arrives in-app.
+Local `npm run tauri build` also needs `TAURI_SIGNING_PRIVATE_KEY` (and `_PASSWORD`) in the environment, or pass
+`--config '{"bundle":{"createUpdaterArtifacts":false}}'`.
 
 ## Local API for MCP / automation
 While Levels runs it serves a small HTTP API on **127.0.0.1 only** (loopback; never reachable from the network, no CORS),

@@ -8,6 +8,7 @@ import { Btn, Field, Panel, SBar, Toggle } from "../ui/kit";
 import { playSound } from "../system/sound";
 import { askTheSystem, lastOracleError, oracleSpentTodayUsd, regenerateToday, testOracle } from "../../oracle/wire";
 import { AgentSettings } from "../agent/AgentSettings";
+import { checkForUpdatesNow, currentAppVersion } from "../../lib/updater";
 
 const DAYS: Weekday[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TABS = [["general", "General"], ["goals", "Goals"], ["popups", "Pop-ups"], ["oracle", "Oracle"], ["agent", "Agent"], ["data", "Data"]] as const;
@@ -155,6 +156,7 @@ export function Settings() {
             <Field label="Player name"><input className="sys-input" value={name} maxLength={24} onChange={(e) => setName(e.target.value)} /></Field>
             <Field label="Day ends at" hint="Your quest resets then. Anything logged before this time counts for the day."><input className="sys-input num !w-28" type="time" value={dayEnds} onChange={(e) => setDayEnds(e.target.value)} /></Field>
             <Field label="Launch at login" hint="Start Levels with your computer so reminders arrive."><Toggle on={auto} onChange={(v) => { setAuto(v); void setAutostart(v).catch(() => setAuto(!v)); }} label="Autostart" /></Field>
+            <UpdateRow />
           </Panel>
         )}
 
@@ -310,4 +312,27 @@ export function friendlyOracleError(log: string | undefined, hasKey: boolean, en
   if (/429|rate|overload/.test(l)) return "The service is busy right now. Wait a minute and try again.";
   if (/network|fetch|failed to|timeout|offline/.test(l)) return "Could not reach the Oracle. Check your internet connection and try again.";
   return "The Oracle didn't answer this time. Check your key, model and budget, then try again.";
+}
+
+/** Settings → General: "Updates: v<current> · [CHECK FOR UPDATES]" with the result inline (src/lib/updater.ts). */
+function UpdateRow() {
+  const [version, setVersion] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState("");
+  useEffect(() => { void currentAppVersion().then(setVersion); }, []);
+  const run = async () => {
+    setBusy(true); setResult("Checking…");
+    const r = await checkForUpdatesNow();
+    setBusy(false);
+    setResult(r.status === "up-to-date" ? "Up to date." : r.status === "available" ? `v${r.version} available — see the System window.` : `Check failed: ${r.message ?? "unknown error"}`);
+  };
+  return (
+    <Field label="Updates">
+      <div className="flex flex-wrap items-center gap-3">
+        {version && <span className="num">v{version} ·</span>}
+        <Btn sm type="button" disabled={busy} onClick={(e) => { e.preventDefault(); void run(); }}>[CHECK FOR UPDATES]</Btn>
+        {result && <span className="tone-dim text-[14px]" role="status">{result}</span>}
+      </div>
+    </Field>
+  );
 }

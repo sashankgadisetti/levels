@@ -54,6 +54,8 @@ jobs:
           if [ -n "$S_TAURI_SIGNING_PRIVATE_KEY" ]; then
             { echo "TAURI_SIGNING_PRIVATE_KEY<<__EOF__"; echo "$S_TAURI_SIGNING_PRIVATE_KEY"; echo "__EOF__"; } >> "$GITHUB_ENV"
             { echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<__EOF__"; echo "$S_TAURI_SIGNING_PRIVATE_KEY_PASSWORD"; echo "__EOF__"; } >> "$GITHUB_ENV"
+            # releases/latest/download/latest.json skips pre-releases, so updatable builds publish as full releases.
+            echo "LEVELS_PRERELEASE=false" >> "$GITHUB_ENV"
             echo "TAURI_SIGNING_PRIVATE_KEY: set (update bundles + latest.json will be signed and uploaded)"
           else
             # `tauri build` refuses createUpdaterArtifacts without a private key, so switch it off for this build only.
@@ -82,7 +84,8 @@ jobs:
             Your data lives in `~/Library/Application Support/dev.levels.app/levels.db`.
             Optional Oracle (Claude-generated quests): Settings → Oracle → paste an Anthropic API key.
           releaseDraft: false
-          prerelease: true
+          # Pre-release unless the build is signed for auto-update (see the export step).
+          prerelease: ${{ env.LEVELS_PRERELEASE != 'false' }}
       - uses: actions/upload-artifact@v4
         with:
           name: levels-macos-dmg

@@ -7,6 +7,7 @@ import { MORE_PREFIX } from "./cadence";
 import { isSnoozeAction, recall, replayFolded, snooze } from "./snooze";
 import { useUi, type Screen } from "./ui";
 import { isProposalArg, resolveProposal } from "../agent/proposals";
+import { UPDATE_INSTALL_ARG, installPendingUpdate } from "../lib/updater";
 
 const OPEN: Record<string, Screen> = {
   "open:status": "status", "open:quest": "daily", "open:shop": "shop", "open:shadows": "shadows", "open:inventory": "inventory",
@@ -24,6 +25,8 @@ export function handleAction(action: Action, ctx: { windowId?: string } = {}): v
   if (action.kind === "accept" && action.arg?.startsWith(MORE_PREFIX)) { replayFolded(action.arg); return; }
   // Agent approval windows (src/agent/proposals.ts): ACCEPT / DECLINE resolve a pending proposal.
   if ((action.kind === "accept" || action.kind === "decline") && isProposalArg(action.arg)) { void resolveProposal(action.arg, action.kind === "accept"); return; }
+  // UPDATE AVAILABLE window (src/lib/updater.ts): INSTALL & RELAUNCH.
+  if (action.kind === "accept" && action.arg === UPDATE_INSTALL_ARG) { void installPendingUpdate(); return; }
   if (!state) return;
   const goal = (id?: string) => state.today?.goals.find((g) => g.id === id);
   switch (action.kind) {
