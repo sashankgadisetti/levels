@@ -12,6 +12,7 @@ import { Starfield } from "./Starfield";
 import { DailyQuest } from "./screens/DailyQuest";
 import { Inventory } from "./screens/Inventory";
 import { Onboarding } from "./screens/Onboarding";
+import { Projects } from "./screens/Projects";
 import { Settings } from "./screens/Settings";
 import { Shadows } from "./screens/Shadows";
 import { Shop } from "./screens/Shop";
@@ -21,7 +22,7 @@ import { HowItWorksModal } from "./HowItWorks";
 import { Btn, Meter } from "./ui/kit";
 
 const VIEWS: Record<Screen, () => React.ReactElement> = {
-  status: Status, daily: DailyQuest, shop: Shop, inventory: Inventory, shadows: Shadows, titles: TitlesSkills, settings: Settings,
+  status: Status, daily: DailyQuest, shop: Shop, inventory: Inventory, shadows: Shadows, titles: TitlesSkills, projects: Projects, settings: Settings,
 };
 
 /** Cmd/Ctrl+K: jump to the Daily Quest and focus the quick-log field of the first unfinished goal. */

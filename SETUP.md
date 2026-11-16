@@ -43,6 +43,16 @@ Settings → Oracle → paste your Anthropic API key (from https://console.anthr
 without it the System uses built-in windows. Usage is billed by Anthropic per token on your own key;
 each generated window is a short request (typically well under a cent on a small model). Set a monthly budget in the same screen.
 
+**Key without pasting it into the app.** If no key is saved in Settings, the desktop app falls back to, in order:
+`ANTHROPIC_API_KEY` in its environment, then the file `anthropic-key` in the app data folder. On macOS, one line sets it up
+(the key is read from your terminal, never stored in the repo):
+
+```bash
+mkdir -p ~/Library/Application\ Support/dev.levels.app && read -s -p "Anthropic API key: " K && echo && printf '%s' "$K" > ~/Library/Application\ Support/dev.levels.app/anthropic-key && chmod 600 ~/Library/Application\ Support/dev.levels.app/anthropic-key
+```
+
+Restart Levels afterwards. Settings → Oracle shows which source the key came from. Delete the file to revoke.
+
 ### Updater
 Auto-update is not enabled yet. TODO: add `tauri-plugin-updater` once release signing keys exist (`npm run tauri signer generate`), and a hosted `latest.json`.
 

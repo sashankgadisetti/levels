@@ -120,6 +120,20 @@ fn tool_response(state: State<'_, api::ApiState>, id: String, result: serde_json
     state.complete(&id, result)
 }
 
+/// Anthropic API key fallback for the Oracle/agent when none is saved in Settings:
+/// `ANTHROPIC_API_KEY` in the environment, else the file `<app_data_dir>/anthropic-key` (trimmed).
+/// Returns `{ key, source }` or null. The key is only ever sent to the webview over the IPC bridge.
+#[tauri::command]
+fn fallback_api_key(app: AppHandle) -> Option<serde_json::Value> {
+    if let Ok(k) = std::env::var("ANTHROPIC_API_KEY") {
+        let k = k.trim().to_string();
+        if !k.is_empty() { return Some(serde_json::json!({ "key": k, "source": "env" })); }
+    }
+    let dir = app.path().app_data_dir().ok()?;
+    let k = std::fs::read_to_string(dir.join("anthropic-key")).ok()?.trim().to_string();
+    if k.is_empty() { None } else { Some(serde_json::json!({ "key": k, "source": "file", "path": dir.join("anthropic-key").to_string_lossy() })) }
+}
+
 /// Port and token path of the localhost API (null until it is listening).
 #[tauri::command]
 fn local_api_info(state: State<'_, api::ApiState>) -> Option<api::LocalApiInfo> {
@@ -180,7 +194,8 @@ pub fn run() {
             open_main,
             register_tools,
             tool_response,
-            local_api_info
+            local_api_info,
+            fallback_api_key
         ])
         .manage(api::ApiState::default())
         .setup(move |app| {

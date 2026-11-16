@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
-export const SCREENS = ["daily", "status", "shop", "inventory", "shadows", "titles", "settings"] as const;
+export const SCREENS = ["daily", "status", "shop", "inventory", "shadows", "titles", "projects", "settings"] as const;
 export type Screen = (typeof SCREENS)[number];
 export const SCREEN_LABEL: Record<Screen, string> = {
-  daily: "Daily Quest", status: "Status", shop: "Shop", inventory: "Inventory", shadows: "Shadows", titles: "Titles & Skills", settings: "Settings",
+  daily: "Daily Quest", status: "Status", shop: "Shop", inventory: "Inventory", shadows: "Shadows", titles: "Titles & Skills", projects: "Gates", settings: "Settings",
 };
 
 const SCREEN_KEY = "levels.screen";

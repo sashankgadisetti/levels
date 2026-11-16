@@ -1,6 +1,6 @@
 /** Device-local UI settings + the Oracle API key. The key is read by src/oracle via getOracleApiKey(). */
 import { create } from "zustand";
-import { isTauri } from "../lib/tauri";
+import { invoke, isTauri } from "../lib/tauri";
 
 const KEY = "levels.settings";
 const API_KEY = "oracle.apiKey";
@@ -26,14 +26,31 @@ async function tauriStore() {
   return load("settings.json", { autoSave: true, defaults: {} });
 }
 
+export type ApiKeySource = "settings" | "env" | "file" | "none";
+let lastKeySource: ApiKeySource = "none";
+/** Where the key currently in use came from (for the Settings screen). */
+export const oracleKeySource = (): ApiKeySource => lastKeySource;
+
 export async function getOracleApiKey(): Promise<string | undefined> {
   if (isTauri()) {
     try {
       const v = await (await tauriStore()).get<string>(API_KEY);
-      if (v) return v;
+      if (v) { lastKeySource = "settings"; return v; }
     } catch { /* fall through */ }
   }
-  try { return localStorage.getItem(API_KEY) || undefined; } catch { return undefined; }
+  try {
+    const v = localStorage.getItem(API_KEY);
+    if (v) { lastKeySource = "settings"; return v; }
+  } catch { /* ignore */ }
+  // Fallback (desktop only): ANTHROPIC_API_KEY in the environment, or <appDataDir>/anthropic-key.
+  if (isTauri()) {
+    try {
+      const fb = await invoke<{ key: string; source: "env" | "file" } | null>("fallback_api_key");
+      if (fb?.key) { lastKeySource = fb.source; return fb.key; }
+    } catch { /* ignore */ }
+  }
+  lastKeySource = "none";
+  return undefined;
 }
 
 export async function setOracleApiKey(key: string): Promise<void> {
