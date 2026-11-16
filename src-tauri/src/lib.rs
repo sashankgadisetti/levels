@@ -3,7 +3,10 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewWindow,
 };
+use tauri::State;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+mod api;
 
 const MARGIN: f64 = 24.0;
 
@@ -105,6 +108,24 @@ fn hide_system_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Frontend → Rust on startup: the tool list GET /v1/tools serves.
+#[tauri::command]
+fn register_tools(state: State<'_, api::ApiState>, tools: Vec<serde_json::Value>) {
+    state.set_tools(tools);
+}
+
+/// Frontend → Rust: the ToolResult for a `levels://tool-request` event.
+#[tauri::command]
+fn tool_response(state: State<'_, api::ApiState>, id: String, result: serde_json::Value) -> bool {
+    state.complete(&id, result)
+}
+
+/// Port and token path of the localhost API (null until it is listening).
+#[tauri::command]
+fn local_api_info(state: State<'_, api::ApiState>) -> Option<api::LocalApiInfo> {
+    state.info()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let toggle = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyS);
@@ -152,7 +173,16 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![show_system_window, hide_system_window, fit_system_window, open_main])
+        .invoke_handler(tauri::generate_handler![
+            show_system_window,
+            hide_system_window,
+            fit_system_window,
+            open_main,
+            register_tools,
+            tool_response,
+            local_api_info
+        ])
+        .manage(api::ApiState::default())
         .setup(move |app| {
             // CmdOrCtrl+Shift+S: Cmd on macOS, Ctrl elsewhere.
             let sc = if cfg!(target_os = "macos") { toggle } else { toggle_alt };
@@ -201,6 +231,8 @@ pub fn run() {
                 }
             })
             .build(app)?;
+
+            api::start(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

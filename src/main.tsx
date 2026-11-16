@@ -5,9 +5,14 @@ import { MainShell } from "./components/MainShell";
 import { SystemPopup } from "./components/SystemPopup";
 import { bootstrapStore } from "./store/bootstrap";
 import { installOracle } from "./oracle/wire";
+import { installToolBridge } from "./lib/bridge";
+import { toolHost } from "./agent/tools";
 
 bootstrapStore();
-if (!(window.location.pathname === "/system" || window.location.pathname.endsWith("/system.html"))) installOracle();
+if (!(window.location.pathname === "/system" || window.location.pathname.endsWith("/system.html"))) {
+  installOracle();
+  installToolBridge(toolHost);
+}
 
 // Tiny pathname router. Works for dev ("/system") and the built multi-page app ("/system.html").
 export function App() {

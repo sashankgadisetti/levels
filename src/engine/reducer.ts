@@ -20,7 +20,8 @@ import { migrate, STATE_REV, withHydration } from "./migrate";
 import { canRest, canUndoRest, restsUsed } from "./rest";
 import { hoursUntilDayEnd } from "./selectors";
 import * as W from "./windows";
-import type { Config, Event, Goal, HunterRank, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
+import { GATE_XP, STRIKE_XP_MULT, strikeGoalsFor } from "./projects";
+import type { Config, Event, Goal, HunterRank, Project, ProjectStatus, ProjectStrike, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
 
 const STATS: StatId[] = ["STR", "VIT", "AGI", "INT", "SENSE", "HYD"];
 const HISTORY_CAP = 800;
@@ -52,6 +53,7 @@ function draft(s: State): State {
     rewards: s.rewards.map((r) => ({ ...r })), titles: s.titles.slice(), skills: s.skills.slice(), shadows: s.shadows.slice(),
     pendingExtractions: s.pendingExtractions?.slice(), counters: s.counters && { ...s.counters },
     warned: s.warned && { ...s.warned, hours: s.warned.hours.slice() }, queuedPopups: s.queuedPopups?.slice(),
+    projects: s.projects?.map((p) => ({ ...p, milestones: p.milestones.map((m) => ({ ...m })), strikes: { ...p.strikes } })),
   };
 }
 
@@ -109,6 +111,8 @@ function startDay(c: Ctx, date: YMD): void {
   if (last && last.date >= date) return; // that day is already closed
   if (last && daysBetween(last.date, date) >= 8) s.counters = { ...(s.counters ?? {}), comebackPending: 1 };
   s.today = buildDailyQuest(s.config, date, s.player.level, c.at, (id) => restsUsed(s, id, date));
+  // Project strikes: the boss's daily strike joins the quest like any other goal.
+  for (const g of strikeGoalsFor(s.projects, date)) if (!s.today.goals.some((x) => x.id === g.id)) s.today.goals.push(g);
   s.warned = undefined;
   popup(c, W.dailyQuest(s));
   if (s.config.oracle.enabled) {
@@ -128,7 +132,7 @@ function closeDay(c: Ctx, date: YMD): void {
   if (!q || q.date !== date) return;
   const cfg = s.config, n = q.goals.length;
   q.closedAt = c.at;
-  if (n === 0) { finishDay(s, q); return; }
+  if (n === 0) { finishDay(s, q); resolveProjects(c, date); return; }
 
   const missed = q.goals.filter((g) => !g.done);
   const prev = s.history[s.history.length - 1]?.result;
@@ -186,6 +190,110 @@ function closeDay(c: Ctx, date: YMD): void {
   announceLevel(c, lvl);
   checkUnlocks(c);
   for (const o of so.offers) popup(c, W.shadowOffer(o.stat, o.milestone));
+  resolveProjects(c, date);
+}
+
+// --- Project quests (boss fights) ---------------------------------------------------------------
+
+/** At the close of `date`, resolve every active project whose deadline is `date` or earlier. */
+function resolveProjects(c: Ctx, date: YMD): void {
+  for (const p of c.s.projects ?? []) {
+    if (p.status !== "active" || p.deadline > date) continue;
+    if (p.milestones.length > 0 && p.milestones.every((m) => m.done)) clearGate(c, p);
+    else failGate(c, p);
+  }
+}
+
+function clearGate(c: Ctx, p: Project): void {
+  const s = c.s;
+  p.status = "cleared"; p.resolvedAt = c.at;
+  const gold = s.config.economy.goldGate, xp = p.xpBonus || GATE_XP;
+  s.gatesCleared += 1; s.gold += gold; s.boxes += 1;
+  bump(s, "projectsCleared");
+  const lvl = awardXp(c, xp);
+  popup(c, W.gateCleared(p, { gold, xp }));
+  announceLevel(c, lvl);
+}
+
+function failGate(c: Ctx, p: Project): void {
+  p.status = "failed"; p.resolvedAt = c.at;
+  popup(c, W.gateFailed(p));
+}
+
+/** Remove a project's unfinished strike from the open day (abandoned / resolved early). */
+function dropStrike(c: Ctx, projectId: string): void {
+  const q = c.s.today;
+  if (!q) return;
+  const before = q.goals.length;
+  q.goals = q.goals.filter((g) => g.projectId !== projectId || g.done);
+  if (q.goals.length !== before && !q.rewardedAt && isFullClear(q)) rewardClear(c, q);
+}
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+const STATUSES: ProjectStatus[] = ["active", "cleared", "failed", "abandoned"];
+
+function cleanStrikes(p: Project, strikes: Record<YMD, ProjectStrike>): Record<YMD, ProjectStrike> {
+  const out: Record<YMD, ProjectStrike> = {};
+  for (const [d, st] of Object.entries(strikes ?? {})) {
+    if (!YMD_RE.test(d) || d > p.deadline || !st?.title?.trim()) continue;
+    const minutes = st.minutes && st.minutes > 0 ? Math.min(600, Math.round(st.minutes)) : undefined;
+    out[d] = { title: st.title.trim().slice(0, 44), ...(minutes ? { minutes } : {}), ...(st.milestoneId ? { milestoneId: st.milestoneId } : {}) };
+  }
+  return out;
+}
+
+function applyProject(c: Ctx, ev: Extract<Event, { type: `PROJECT_${string}` }>): void {
+  const s = c.s;
+  if (ev.type === "PROJECT_CREATED") {
+    const src = ev.project;
+    if (!src?.id || !src.title?.trim() || !YMD_RE.test(src.deadline) || !STATS.includes(src.stat)) return;
+    if (s.projects?.some((p) => p.id === src.id)) return;
+    const p: Project = {
+      id: src.id, title: src.title.trim().slice(0, 120), bossName: (src.bossName || "Unnamed Boss").trim().slice(0, 60), stat: src.stat,
+      deadline: src.deadline, createdAt: ev.at, status: "active",
+      milestones: (src.milestones ?? []).map((m) => ({ id: m.id, title: m.title.slice(0, 120), done: !!m.done, ...(m.done ? { doneAt: m.doneAt ?? ev.at } : {}) })),
+      strikes: {}, xpBonus: src.xpBonus && src.xpBonus > 0 ? src.xpBonus : GATE_XP,
+    };
+    p.strikes = cleanStrikes(p, src.strikes ?? {});
+    s.projects = [...(s.projects ?? []), p];
+    popup(c, W.projectCreated(p));
+    return;
+  }
+  const p = s.projects?.find((x) => x.id === ev.projectId);
+  if (!p || p.status !== "active") return;
+  switch (ev.type) {
+    case "PROJECT_PLANNED": {
+      const prev = new Map(p.milestones.map((m) => [m.id, m]));
+      p.milestones = ev.milestones.filter((m) => m.id && m.title?.trim()).slice(0, 12).map((m) => {
+        const old = prev.get(m.id);
+        const done = m.done ?? old?.done ?? false;
+        return { id: m.id, title: m.title.trim().slice(0, 120), done, ...(done ? { doneAt: old?.doneAt ?? ev.at } : {}) };
+      });
+      // Replace the plan from the open day on; strikes already behind us stay as the record.
+      const cutoff = s.today?.date ?? localDate(ev.at, s.config.player.dayEndsAt);
+      const kept = Object.fromEntries(Object.entries(p.strikes).filter(([d]) => d < cutoff));
+      const fresh = Object.fromEntries(Object.entries(cleanStrikes(p, ev.strikes)).filter(([d]) => d >= cutoff));
+      p.strikes = { ...kept, ...fresh };
+      return;
+    }
+    case "PROJECT_MILESTONE_SET": {
+      const m = p.milestones.find((x) => x.id === ev.milestoneId);
+      if (!m || m.done === ev.done) return;
+      m.done = ev.done;
+      if (ev.done) m.doneAt = ev.at; else delete m.doneAt;
+      return;
+    }
+    case "PROJECT_STATUS": {
+      if (!STATUSES.includes(ev.status) || ev.status === "active") return;
+      if (ev.status === "cleared") {
+        if (!(p.milestones.length > 0 && p.milestones.every((m) => m.done))) return; // the boss is not dead yet
+        clearGate(c, p);
+      } else if (ev.status === "failed") failGate(c, p);
+      else { p.status = "abandoned"; p.resolvedAt = ev.at; }
+      dropStrike(c, p.id);
+      return;
+    }
+  }
 }
 
 /** Pay goal XP/gold/vitals and stat points (+ full-clear bonus and box when `cleared`) and apply level-ups. Shadow gold is paid at close. */
@@ -200,7 +308,7 @@ function payGoals(c: Ctx, q: NonNullable<State["today"]>, cleared: boolean) {
     const h = habitOf(cfg, g);
     const diff = h && h.kind !== "check" && h.target > 0 ? Math.max(1, g.target / h.target) : 1;
     const mult = Math.min(3, Math.min(3, 1 + titleXpBonus(s, g.stat) + boost) * (g.xpMult ?? 1));
-    const gx = Math.round(cfg.curves.xpPerGoal * diff * (g.rest ? 0.5 : 1) * mult);
+    const gx = Math.round(cfg.curves.xpPerGoal * diff * (g.rest ? 0.5 : 1) * mult * (g.projectId ? STRIKE_XP_MULT : 1));
     xp += gx;
     gold += goalGold(s, !!g.rest);
     const v = goalVitals(g.stat);
@@ -437,6 +545,7 @@ function apply(c: Ctx, ev: Event): void {
       return;
     }
     case "CHECKIN_ANSWERED": answerCheckIn(c, ev.habitId, ev.yes); return;
+    case "PROJECT_CREATED": case "PROJECT_PLANNED": case "PROJECT_MILESTONE_SET": case "PROJECT_STATUS": applyProject(c, ev); return;
     case "TICK": tick(c); return;
     case "CONFIG_CHANGED":
       s.config = { ...s.config, ...withHydration(ev.patch) };

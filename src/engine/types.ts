@@ -43,7 +43,7 @@ export interface Config {
   oracle: { enabled: boolean; model: string; flavorModel: string; dailyBudgetUsd: number };
 }
 
-export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */; mode?: "yesno" /* logged one yes at a time, no amounts */; statPaid?: number /* stat points already credited for this goal */; restManual?: boolean /* rested with the Rest day button */ }
+export interface Goal { id: string; habitId: string; stat: StatId; label: string; target: number; unit: string; current: number; done: boolean; rest?: boolean; xpMult?: number /* set by Sprint */; mode?: "yesno" /* logged one yes at a time, no amounts */; statPaid?: number /* stat points already credited for this goal */; restManual?: boolean /* rested with the Rest day button */; projectId?: string /* daily strike of a Project (boss fight) */ }
 export interface DailyQuest { date: YMD; goals: Goal[]; startedAt: ISO; closedAt?: ISO; rewardedAt?: ISO /* full-clear rewards paid at this time */; result?: "clear" | "partial" | "fail"; xpEarned?: number; goldEarned?: number }
 
 export interface Item { id: string; defId: string; name: string; rarity: Rarity; description: string; consumable: boolean; obtainedAt: ISO }
@@ -58,6 +58,24 @@ export interface Penalty {
   makeup?: Record<string, number>;
   /** last date a "penalty persists" reminder was shown */
   warnedDate?: YMD;
+}
+/** A Project quest ("boss fight"): a real goal with a deadline, framed as a Gate with a boss. See engine/projects.ts. */
+export type ProjectStatus = "active" | "cleared" | "failed" | "abandoned";
+export interface ProjectMilestone { id: string; title: string; done: boolean; doneAt?: ISO }
+export interface ProjectStrike { title: string; minutes?: number; milestoneId?: string }
+export interface Project {
+  id: string;
+  title: string;
+  bossName: string;
+  stat: StatId;
+  deadline: YMD;               // last day to work; resolved when this day closes
+  createdAt: ISO;
+  status: ProjectStatus;
+  milestones: ProjectMilestone[];
+  strikes: Record<YMD, ProjectStrike>;
+  /** XP paid when the Gate is cleared (default 400, docs/04 §5). */
+  xpBonus: number;
+  resolvedAt?: ISO;
 }
 export interface PendingExtraction { stat: StatId; milestone: number; offeredAt: ISO }
 
@@ -96,6 +114,7 @@ export interface State {
   checkIns?: Record<string, ISO>;                    // last yes/no prompt time per habit id
   lastGymDate?: YMD;
   queuedPopups?: SystemWindowSpec[];                 // held back by quiet hours / Stealth
+  projects?: Project[];                              // Project quests (boss fights)
 }
 
 export type Event =
@@ -121,7 +140,11 @@ export type Event =
   | { type: "GATE_RESULT"; week: string; cleared: boolean; at: ISO }
   | { type: "CHECKIN_ANSWERED"; habitId: string; yes: boolean; at: ISO }
   | { type: "TICK"; at: ISO }
-  | { type: "CONFIG_CHANGED"; patch: Partial<Config>; at: ISO };
+  | { type: "CONFIG_CHANGED"; patch: Partial<Config>; at: ISO }
+  | { type: "PROJECT_CREATED"; project: Omit<Project, "createdAt" | "status" | "milestones" | "strikes" | "xpBonus"> & Partial<Pick<Project, "milestones" | "strikes" | "xpBonus">>; at: ISO }
+  | { type: "PROJECT_PLANNED"; projectId: string; milestones: { id: string; title: string; done?: boolean }[]; strikes: Record<YMD, ProjectStrike>; at: ISO }
+  | { type: "PROJECT_MILESTONE_SET"; projectId: string; milestoneId: string; done: boolean; at: ISO }
+  | { type: "PROJECT_STATUS"; projectId: string; status: ProjectStatus; at: ISO };
 
 export type Effect =
   | { kind: "popup"; spec: SystemWindowSpec }

@@ -1,6 +1,6 @@
 /** Template System windows. Voice: bracketed, deadpan, second person. All specs are validated by parseSpec. */
 import { parseSpec, type SystemWindowInput, type SystemWindowSpec } from "../system/spec";
-import type { DailyQuest, Goal, HabitDef, HunterRank, Item, Penalty, Shadow, Skill, StatId, State, Title } from "./types";
+import type { DailyQuest, Goal, HabitDef, HunterRank, Item, Penalty, Project, ProjectStrike, Shadow, Skill, StatId, State, Title, YMD } from "./types";
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const isTest = () => !!(globalThis as { process?: { env?: Record<string, string> } }).process?.env?.VITEST;
@@ -279,5 +279,75 @@ export function checkIn(habit: HabitDef, goal: Goal, n: number): SystemWindowSpe
     ],
     actions: [{ label: "YES", kind: "answer:yes", arg: habit.id, primary: true }, { label: "NO", kind: "answer:no", arg: habit.id }],
     sound: "ding", timeoutMs: 120_000,
+  });
+}
+
+// --- Project quests (boss fights) ---------------------------------------------------------------
+
+const pid = (prefix: string, p: Project) => clip(`${prefix}-${p.id}`, 64);
+const strikeLine = (date: YMD, st: ProjectStrike) => clip(`${date.slice(5)}  ${st.title}${st.minutes ? `  (${st.minutes} min)` : ""}`, 140);
+
+export function projectCreated(p: Project): SystemWindowSpec {
+  return make({
+    id: pid("gate-open", p), variant: "gate", title: "A GATE HAS OPENED", glyph: "diamond",
+    blocks: [
+      { type: "text", text: `Boss: ${clip(p.bossName, 60)}`, tone: "gold" },
+      { type: "kv", rows: [["OBJECTIVE", clip(p.title, 64)], ["DEADLINE", p.deadline], ["STAT", statLabel(p.stat)]] },
+      { type: "text", text: "A daily strike will appear in your Daily Quest. Defeat the boss before the deadline.", tone: "dim" },
+    ],
+    actions: [{ label: "OPEN QUEST", kind: "open:quest", primary: true }, close], sound: "ding", timeoutMs: 15_000,
+  });
+}
+
+/** Approval window for a (re-)plan. ACCEPT / DECLINE are handled by the Projects screen. */
+export function projectPlanned(p: Pick<Project, "id" | "title" | "bossName" | "deadline" | "stat">, plan: { milestones: { title: string; done?: boolean }[]; strikes: { date: YMD; strike: ProjectStrike }[]; verdict?: string }): SystemWindowSpec {
+  const blocks: SystemWindowInput["blocks"] = [
+    { type: "text", text: `${clip(p.bossName, 60)}   DEADLINE ${p.deadline}`, tone: "gold" },
+    { type: "kv", rows: [["OBJECTIVE", clip(p.title, 64)], ["STAT", statLabel(p.stat)]] },
+    { type: "text", text: "MILESTONES", tone: "dim" },
+    { type: "list", items: plan.milestones.slice(0, 10).map((m, i) => clip(`${m.done ? "[x]" : `${i + 1}.`} ${m.title}`, 140)), tone: "cyan" },
+    { type: "text", text: "STRIKES THIS WEEK", tone: "dim" },
+    plan.strikes.length
+      ? { type: "list", items: plan.strikes.slice(0, 10).map((x) => strikeLine(x.date, x.strike)) }
+      : { type: "text", text: "No strikes scheduled this week.", tone: "dim" },
+  ];
+  if (plan.verdict) blocks.push({ type: "text", text: clip(plan.verdict, 400) });
+  return make({
+    id: clip(`gate-plan-${p.id}`, 64), variant: "gate", title: "GATE ANALYSIS", glyph: "diamond", blocks,
+    actions: [{ label: "ACCEPT", kind: "accept", primary: true }, { label: "DECLINE", kind: "decline" }], sound: "ding", timeoutMs: 0,
+  });
+}
+
+export function gateCleared(p: Project, reward: { gold: number; xp: number }): SystemWindowSpec {
+  return make({
+    id: pid("gate-cleared", p), variant: "reward", title: "GATE CLEARED", glyph: "crown",
+    blocks: [
+      { type: "text", text: `${clip(p.bossName, 60)} defeated.`, tone: "gold", align: "center" },
+      { type: "kv", rows: [["OBJECTIVE", clip(p.title, 64)], ["MILESTONES", `${p.milestones.length} / ${p.milestones.length}`], ["REWARD", `GOLD +${reward.gold}   XP +${reward.xp}   RANDOM BOX`]] },
+      { type: "text", text: "The Gate collapses. The System has recorded your victory.", tone: "dim" },
+    ],
+    actions: [{ label: "OPEN BOX", kind: "open:box", primary: true }, close], sound: "levelup", timeoutMs: 0,
+  });
+}
+
+export function gateFailed(p: Project): SystemWindowSpec {
+  const done = p.milestones.filter((m) => m.done).length;
+  return make({
+    id: pid("gate-failed", p), variant: "warning", title: "GATE FAILED", glyph: "skull",
+    blocks: [
+      { type: "text", text: `The deadline has passed. ${clip(p.bossName, 60)} still stands.`, tone: "red" },
+      { type: "kv", rows: [["OBJECTIVE", clip(p.title, 64)], ["MILESTONES", `${done} / ${p.milestones.length}`]] },
+      { type: "text", text: "The System does not grade on effort. Open a new Gate when you are ready.", tone: "dim" },
+    ],
+    actions: [close], sound: "ding", timeoutMs: 20_000,
+  });
+}
+
+/** Optional morning reminder for today's strike. */
+export function strikeDue(p: Project, goal: Goal): SystemWindowSpec {
+  return make({
+    id: clip(`strike-${goal.id}`, 64), variant: "quest", title: "BOSS STRIKE AVAILABLE", glyph: "diamond",
+    blocks: [{ type: "text", text: `${clip(p.bossName, 60)} awaits.`, tone: "gold" }, goalRow(goal)],
+    actions: [{ label: "OPEN QUEST", kind: "open:quest", primary: true }, close], sound: "ding", timeoutMs: 20_000,
   });
 }

@@ -1,0 +1,26 @@
+{
+  "name": "@levels/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server (stdio) that exposes the Levels desktop app to Claude Desktop, Claude Code and any MCP client.",
+  "type": "module",
+  "bin": { "levels-mcp": "dist/index.js" },
+  "main": "dist/index.js",
+  "files": ["dist"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
