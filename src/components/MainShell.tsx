@@ -99,7 +99,7 @@ export function MainShell() {
         <Onboarding />
       ) : (
         <>
-          <header className="relative z-10 flex items-center gap-x-5 border-b border-[rgba(63,216,255,.3)] bg-[rgba(2,6,13,.7)] px-5 py-2 backdrop-blur">
+          <header className="relative z-10 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-[rgba(63,216,255,.3)] bg-[rgba(2,6,13,.7)] px-5 py-2 backdrop-blur">
             <h1 className="m-0 font-[family-name:var(--font-head)] text-[15px] tracking-[0.3em] text-[var(--sl-cyan)]" style={{ textShadow: "0 0 12px var(--sl-cyan)" }}>LEVELS</h1>
             <div className="flex items-baseline gap-2.5 whitespace-nowrap">
               <span className="max-w-[140px] truncate text-[17px] font-semibold">{state.player.name}</span>
@@ -109,7 +109,7 @@ export function MainShell() {
             <Meter label="MP" value={state.vitals.mp} max={max!.mp} tone="blue" />
             <Meter label="XP" value={state.player.xp} max={state.player.xpToNext} tone="purple" title={`XP ${state.player.xp} / ${state.player.xpToNext} to level ${state.player.level + 1}`} />
             <QuickBar />
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex shrink-0 items-center gap-3 whitespace-nowrap">
               <DungeonHud state={state} />
               <button className={`pill ${prog.total > 0 && prog.done === prog.total ? "ok" : ""} ${state.dungeon ? "max-2xl:hidden" : ""}`} onClick={() => setScreen("daily")} aria-label={`Today's goals: ${prog.done} of ${prog.total} done. Open the Daily Quest`} data-testid="today-pill">
                 {prog.total > 0 && prog.done === prog.total ? "\u2713 " : ""}today: {prog.done}/{prog.total}

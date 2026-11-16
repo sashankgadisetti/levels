@@ -47,7 +47,7 @@ export function QuickBar() {
   };
 
   return (
-    <div className="relative min-w-[120px] max-w-[340px] flex-1">
+    <div className="relative order-last basis-full xl:order-none xl:basis-auto xl:min-w-[180px] xl:max-w-[340px] xl:flex-1">
       <input
         ref={ref}
         className="sys-input !py-1 !text-[15px]"

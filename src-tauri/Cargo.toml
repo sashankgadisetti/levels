@@ -1,6 +1,6 @@
 [package]
 name = "levels"
-version = "0.2.6"
+version = "0.2.7"
 description = "Levels — a Solo Leveling-style life-RPG habit tracker"
 edition = "2021"
 
