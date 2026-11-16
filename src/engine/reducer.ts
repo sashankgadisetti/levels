@@ -21,7 +21,8 @@ import { canRest, canUndoRest, restsUsed } from "./rest";
 import { hoursUntilDayEnd } from "./selectors";
 import * as W from "./windows";
 import { GATE_XP, STRIKE_XP_MULT, strikeGoalsFor } from "./projects";
-import type { Config, Event, Goal, HunterRank, Project, ProjectStatus, ProjectStrike, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
+import { clampDungeonMinutes, isDungeonKey, isMinutesGoal, KEY_REFUND_MS, keyRank } from "./dungeons";
+import type { Config, Event, Goal, HunterRank, Item, Project, ProjectStatus, ProjectStrike, ReduceResult, State, StatId, YMD , DailyQuest } from "./types";
 
 const STATS: StatId[] = ["STR", "VIT", "AGI", "INT", "SENSE", "HYD"];
 const HISTORY_CAP = 800;
@@ -214,6 +215,12 @@ function clearGate(c: Ctx, p: Project): void {
 function failGate(c: Ctx, p: Project): void {
   p.status = "failed"; p.resolvedAt = c.at;
   popup(c, W.gateFailed(p));
+}
+
+/** habitId of a goal referenced by a penalty (looks in history, then today). */
+function findGoalHabit(s: State, goalId: string): string | undefined {
+  for (const d of s.history) { const g = d.goals.find((x) => x.id === goalId); if (g) return g.habitId; }
+  return s.today?.goals.find((x) => x.id === goalId)?.habitId;
 }
 
 /** Remove a project's unfinished strike from the open day (abandoned / resolved early). */
@@ -440,8 +447,15 @@ function touchGoal(c: Ctx, goalId: string, fn: (v: number) => number): void {
   const s = c.s, g = s.today?.goals.find((x) => x.id === goalId);
   if (!g) return;
   const was = g.done;
+  const before = g.current;
   setGoalValue(g, s.today!.rewardedAt ? Math.max(g.target, fn(g.current)) : fn(g.current));
   settleStat(s, g, s.today!.date);
+  // Penalty makeup: doing the same habit today counts toward yesterday's missed goal (half target).
+  const pen = s.penalty;
+  if (pen && !pen.cleared && g.current > before) {
+    const missedId = pen.missedGoalIds.find((id) => findGoalHabit(s, id) === g.habitId);
+    if (missedId) progressPenalty(c, missedId, g.current - before);
+  }
   if (!was && g.done && !g.rest && s.sprintArmed) { g.xpMult = 2; s.sprintArmed = false; }
   else if (was && !g.done && g.xpMult) { delete g.xpMult; s.sprintArmed = true; }
   const q = s.today!;
@@ -519,6 +533,11 @@ function tick(c: Ctx): void {
     s.penalty = { ...p, warnedDate: cur };
     popup(c, W.penaltyPersists(s.penalty, penaltyViews(s)), { droppable: true });
   }
+  const d = s.dungeon;
+  if (d && !d.timeUpShown && c.at >= d.endsAt) {
+    s.dungeon = { ...d, timeUpShown: true };
+    popup(c, W.dungeonTimeUp(d));
+  }
 }
 
 function useItem(c: Ctx, itemId: string): void {
@@ -540,12 +559,10 @@ function useItem(c: Ctx, itemId: string): void {
       if (!isPenaltyActive(s) && s.vitals.hp >= 100) return;
       consume(); clearPenalty(c, "elixir"); s.vitals.hp = 100;
       break;
-    case "dungeon-key": {
-      consume();
-      const r = rankForLevel(s.player.level);
-      popup(c, W.dungeonKey(r === "NATIONAL" ? "S" : r));
+    case "dungeon-key":
+      // Not consumed here: the key is spent when the dungeon is entered (DUNGEON_STARTED).
+      popup(c, W.dungeonKey(keyRank(it), it.id));
       break;
-    }
     default: break; // streak-shield: auto-consumed at streak break
   }
 }
@@ -563,7 +580,69 @@ function openBox(c: Ctx, seed: number): void {
   popup(c, W.boxOpened(item));
 }
 
-const GATE_MULT: Record<HunterRank, number> = { E: 1, D: 1.5, C: 2, B: 3, A: 4, S: 6, NATIONAL: 6 };
+// --- Instant Dungeons (focus sessions, engine/dungeons.ts) ---------------------------------------
+
+const dungeonLinkLabel = (s: State, goalId?: string) => s.today?.goals.find((g) => g.id === goalId)?.label;
+
+function startDungeon(c: Ctx, ev: Extract<Event, { type: "DUNGEON_STARTED" }>): void {
+  const s = c.s;
+  if (!s.player.accepted) return;
+  if (s.dungeon) { popup(c, W.notice("DUNGEON", "A dungeon is already open. Clear it or abandon it first.", "gold")); return; }
+  let rank: HunterRank = "E", keyItem: Item | undefined;
+  if (ev.keyItemId) {
+    const i = s.inventory.findIndex((x) => x.id === ev.keyItemId);
+    if (i < 0 || !isDungeonKey(s.inventory[i])) { popup(c, W.notice("DUNGEON", "That key is not in your inventory.", "red")); return; }
+    keyItem = s.inventory[i];
+    rank = keyRank(keyItem);
+    s.inventory.splice(i, 1);
+  }
+  const minutes = clampDungeonMinutes(rank, ev.minutes);
+  const link = s.today?.goals.find((g) => g.id === ev.linkGoalId);
+  bump(s, "dungeonSeq");
+  s.dungeon = {
+    id: `dungeon-${count(s, "dungeonSeq")}`, rank, bossName: (ev.bossName ?? "").trim().slice(0, 60) || "Unnamed Boss", minutes,
+    startedAt: ev.at, endsAt: new Date(new Date(ev.at).getTime() + minutes * 60_000).toISOString(),
+    ...(keyItem ? { keyItemId: keyItem.id, keyItem } : {}),
+    ...(link && isMinutesGoal(s, link) ? { linkGoalId: link.id } : {}),
+    keyless: !keyItem,
+  };
+  // The player opened it themselves: show it even in quiet hours / Stealth.
+  c.fx.push({ kind: "popup", spec: W.dungeonEntered(s.dungeon, dungeonLinkLabel(s, s.dungeon.linkGoalId)) });
+}
+
+/** Claim the open dungeon (once its timer is up). With none open, a one-off clear at the given rank (legacy). */
+function clearDungeon(c: Ctx, ev: Extract<Event, { type: "DUNGEON_CLEARED" }>): void {
+  const s = c.s, d = s.dungeon;
+  if (d && new Date(c.at).getTime() < new Date(d.endsAt).getTime() - 60_000) {
+    const left = Math.ceil((new Date(d.endsAt).getTime() - new Date(c.at).getTime()) / 60_000);
+    popup(c, W.notice("THE BOSS STILL STANDS", `${d.bossName}: ${left} min remain. Stay in the dungeon.`, "gold"));
+    return;
+  }
+  const rank = d?.rank ?? ev.rank, boss = d?.bossName ?? ev.bossName, minutes = d?.minutes ?? ev.minutes;
+  const half = d?.keyless ? 0.5 : 1;
+  const r = rankIndex(rank) + 1;
+  const xp = Math.round(r * 40 * half), gold = Math.round(Math.min(80, 10 + r * 10) * half);
+  s.dungeon = undefined;
+  s.dungeonsCleared += 1; s.gold += gold; s.stats.INT.xp += xp; recalcStat(s, "INT");
+  if (minutes) bump(s, "dungeonMinutes", minutes);
+  const lvl = awardXp(c, xp);
+  const goal = d?.linkGoalId ? s.today?.goals.find((g) => g.id === d.linkGoalId) : undefined;
+  const credit = goal && minutes && isMinutesGoal(s, goal) ? goal : undefined;
+  popup(c, W.dungeonCleared(rank, boss, xp, gold, { minutes, keyless: d?.keyless, goalLabel: credit?.label, goalMinutes: minutes }));
+  announceLevel(c, lvl);
+  if (credit) touchGoal(c, credit.id, (v) => v + minutes!); // may complete the goal and the quest (full-clear rewards)
+}
+
+function abandonDungeon(c: Ctx): void {
+  const s = c.s, d = s.dungeon;
+  if (!d) return;
+  s.dungeon = undefined;
+  const refund = !!d.keyItem && new Date(c.at).getTime() - new Date(d.startedAt).getTime() <= KEY_REFUND_MS;
+  if (refund && !s.inventory.some((i) => i.id === d.keyItem!.id)) s.inventory.push({ ...d.keyItem! });
+  c.fx.push({ kind: "popup", spec: W.dungeonAbandoned(d, refund) });
+}
+
+const GATE_MULT: Record<HunterRank, number> ={ E: 1, D: 1.5, C: 2, B: 3, A: 4, S: 6, NATIONAL: 6 };
 
 function apply(c: Ctx, ev: Event): void {
   const s = c.s;
@@ -621,15 +700,9 @@ function apply(c: Ctx, ev: Event): void {
     }
     case "TITLE_EQUIPPED": if (s.titles.some((t) => t.id === ev.titleId)) s.player.equippedTitleId = ev.titleId; return;
     case "SKILL_USED": useSkill(c, ev.skillId, ev.hours); return;
-    case "DUNGEON_CLEARED": {
-      const r = rankIndex(ev.rank) + 1;
-      const xp = r * 40, gold = Math.min(80, 10 + r * 10);
-      s.dungeonsCleared += 1; s.gold += gold; s.stats.INT.xp += xp; recalcStat(s, "INT");
-      const lvl = awardXp(c, xp);
-      popup(c, W.dungeonCleared(ev.rank, ev.bossName, xp, gold));
-      announceLevel(c, lvl);
-      return;
-    }
+    case "DUNGEON_STARTED": startDungeon(c, ev); return;
+    case "DUNGEON_CLEARED": clearDungeon(c, ev); return;
+    case "DUNGEON_ABANDONED": abandonDungeon(c); return;
     case "GATE_RESULT": {
       if (!ev.cleared) return;
       const rank = s.player.rank, gold = Math.round(s.config.economy.goldGate * GATE_MULT[rank]), xp = 400;

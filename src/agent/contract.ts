@@ -45,6 +45,8 @@ export const TOOL_NAMES = [
   "complete_goal",     // mark a goal done
   "answer_checkin",    // yes/no habits (water)
   "take_rest_day",     // use a weekly rest on a habit that has rest days
+  "start_dungeon",     // {minutes?, boss?, goal_id?, use_key?} — open an Instant Dungeon (focus timer)
+  "abandon_dungeon",   // leave the open Instant Dungeon (key returned within 2 min)
   "log_past_day",      // amend a day that already ended: mark its goals complete (last 7 days)
   "undo_last_log",     // revert the most recent progress entry made today
   "list_rewards", "add_reward", "buy_reward",

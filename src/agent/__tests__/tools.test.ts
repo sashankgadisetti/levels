@@ -119,6 +119,42 @@ describe("write tools", () => {
     expect((await run("take_rest_day", { habit_id: "study" })).ok).toBe(false);
   });
 
+  it("start_dungeon without a key opens a keyless E-rank dungeon linked to Study; abandon_dungeon closes it", async () => {
+    const { store, goal } = await setupAgentStore();
+    const r = await run("start_dungeon", { boss: "Chapter 3", minutes: 50 });
+    expect(r.ok, r.content).toBe(true);
+    expect(r.content).toMatch(/DUNGEON ENTERED/);
+    const d = store.getState().state!.dungeon!;
+    expect(d).toMatchObject({ rank: "E", minutes: 25, keyless: true, bossName: "Chapter 3", linkGoalId: goal("study").id });
+    expect((r.data as { seconds_left: number }).seconds_left).toBe(25 * 60);
+    expect((await run("start_dungeon", {})).ok).toBe(false); // one at a time
+    expect((await run("start_dungeon", { use_key: true })).ok).toBe(false);
+    const a = await run("abandon_dungeon");
+    expect(a.ok, a.content).toBe(true);
+    expect(store.getState().state!.dungeon).toBeUndefined();
+    expect((await run("abandon_dungeon")).ok).toBe(false);
+    expect((await run("start_dungeon", { goal_id: goal("gym").id })).ok).toBe(false); // not a minutes goal
+    expect((await run("start_dungeon", { use_key: true })).ok).toBe(false); // no key held
+  });
+
+  it("start_dungeon spends the best key, clamps minutes to its rank, and abandon refunds it early", async () => {
+    const { store } = await setupAgentStore();
+    const mk = (id: string, rank: string) => ({ id, defId: "dungeon-key", name: `Dungeon Key (${rank})`, rarity: "rare" as const, description: "", consumable: true, obtainedAt: "" });
+    const st = store.getState().state!;
+    store.setState({ state: { ...st, inventory: [...st.inventory, mk("kd", "D"), mk("kb", "B")] } });
+    const r = await run("start_dungeon", { minutes: 120 });
+    expect(r.ok, r.content).toBe(true);
+    const d = store.getState().state!.dungeon!;
+    expect(d).toMatchObject({ rank: "B", minutes: 90, keyless: false, keyItemId: "kb" });
+    expect(store.getState().state!.inventory.map((i) => i.id)).not.toContain("kb");
+    const a = await run("abandon_dungeon");
+    expect((a.data as { refunded: boolean }).refunded).toBe(true); // same clock: within 2 minutes
+    expect(store.getState().state!.inventory.map((i) => i.id)).toContain("kb");
+    const k = await run("start_dungeon", { use_key: false });
+    expect(store.getState().state!.dungeon).toMatchObject({ rank: "E", keyless: true });
+    expect(k.ok).toBe(true);
+  });
+
   it("log_past_day amends yesterday: marks its goals complete and records the day", async () => {
     const { store } = await setupAgentStore();
     const r = await run("log_past_day", { days_ago: 1 });

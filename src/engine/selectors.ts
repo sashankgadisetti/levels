@@ -13,6 +13,7 @@ import type { DailyQuest, HunterRank, ISO, RewardDef, Skill, StatId, State, Stre
 
 export { rankForLevel, nextRankAt, canPurchase, rewardGoldPrice, penaltyGoals, isPenaltyActive };
 export { canRest, canUndoRest, restsUsed, restAllowance } from "./rest";
+export { activeDungeon, dungeonSecondsLeft, dungeonKeys, dungeonBoundsFor, clampDungeonMinutes, linkableGoals, defaultLinkGoal, defaultBossName, keyRank } from "./dungeons";
 export type { PurchaseCheck };
 
 export const xpToNext = (level: number, s?: State) => xpToNextRaw(level, s?.config.curves);

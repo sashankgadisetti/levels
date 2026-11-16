@@ -42,7 +42,8 @@ export function shouldLog(event: Event, prev: State, next: State, effects: Effec
     prev.today?.date !== next.today?.date ||
     prev.history.length !== next.history.length ||
     !!prev.penalty !== !!next.penalty ||
-    prev.penalty?.cleared !== next.penalty?.cleared
+    prev.penalty?.cleared !== next.penalty?.cleared ||
+    prev.dungeon !== next.dungeon
   );
 }
 

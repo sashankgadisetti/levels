@@ -68,7 +68,7 @@ describe("boxes & items", () => {
     r = feed(r, { type: "ITEM_USED", itemId: id("elixir-of-life"), at: T(MON, "11:00") });
     expect(r.s.vitals.hp).toBe(100);
     r = feed(r, { type: "ITEM_USED", itemId: id("dungeon-key"), at: T(MON, "11:00") });
-    expect(r.s.inventory).toHaveLength(0);
+    expect(r.s.inventory.map((i) => i.defId)).toEqual(["dungeon-key"]); // spent on DUNGEON_STARTED, not on use
   });
   it("Elixir clears the penalty and the shield cap holds", () => {
     let r = nextDay(started(undefined, (s) => { s.inventory.push({ id: "e1", defId: "elixir-of-life", name: "E", rarity: "legendary", description: "", consumable: true, obtainedAt: "" }); }));

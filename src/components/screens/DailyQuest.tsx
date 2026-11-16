@@ -10,6 +10,7 @@ import { usePopups } from "../../store/popups";
 import { useUi } from "../../store/ui";
 import { Btn, Empty, Panel } from "../ui/kit";
 import { HowItWorksCard } from "../HowItWorks";
+import { showDungeonWindow } from "../dungeon/DungeonHud";
 
 export function DailyQuest() {
   const s = useGameState();
@@ -21,6 +22,7 @@ export function DailyQuest() {
   const xp = prog.total * cfg.curves.xpPerGoal + cfg.curves.fullClearBonus;
   const gold = prog.total * cfg.economy.goldPerGoal + cfg.economy.goldFullClear;
   const helpSeen = useUi((u) => u.helpSeen);
+  const openDungeon = useUi((u) => u.openDungeonDialog);
   const popupsOpen = usePopups((p) => p.queue.length > 0);
   const cleared = q?.result === "clear" || (prog.total > 0 && prog.done === prog.total);
 
@@ -29,12 +31,15 @@ export function DailyQuest() {
       {s.penalty && !s.penalty.cleared && (
         <Panel accent="red" title="Penalty Quest: Survive">
           <div className="flex items-center justify-between gap-4">
-            <span className="tone-red">Clear a missed goal before the timer ends to survive.</span>
+            <span className="tone-red">Do half of each missed goal today to escape; progress on those goals counts automatically.</span>
             <PenaltyTimer endsAt={s.penalty.endsAt} />
           </div>
         </Panel>
       )}
-      <Panel title="Daily Quest: Preparation to Become Powerful" accent={cleared ? "gold" : undefined}>
+      <Panel title="Daily Quest: Preparation to Become Powerful" accent={cleared ? "gold" : undefined}
+        right={s.dungeon
+          ? <Btn sm onClick={() => showDungeonWindow(s)} data-testid="open-dungeon">[IN DUNGEON]</Btn>
+          : <Btn sm onClick={() => openDungeon()} title="Start a focus session: a timed Instant Dungeon" data-testid="enter-dungeon-btn">[ENTER DUNGEON]</Btn>}>
         {!q ? (
           <Empty>No quest yet. Your next one arrives when the day turns over.</Empty>
         ) : (

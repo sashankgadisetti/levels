@@ -22,6 +22,7 @@ export const Action = z.object({
     "dismiss", "accept", "decline",
     "open:status", "open:quest", "open:shop", "open:shadows", "open:inventory",
     "complete:goal", "progress:goal", "answer:yes", "answer:no", "allocate:points", "start:dungeon", "open:box", "use:item", "extract:shadow",
+    "dungeon:claim", "dungeon:abandon",
   ]),
   arg: z.string().max(64).optional(),
   primary: z.boolean().optional(),

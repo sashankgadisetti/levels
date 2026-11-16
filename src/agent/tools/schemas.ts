@@ -36,6 +36,13 @@ export const SCHEMAS = {
     yes: z.boolean().describe("true = the player did it since the last check-in (+1); false = not yet."),
   }),
   take_rest_day: z.strictObject({ ...goalRef }),
+  start_dungeon: z.strictObject({
+    minutes: z.number().int().min(1).max(180).optional().describe("Focus session length in minutes. Clamped to the dungeon rank's bounds: E 25, D 25–50, C 50, B 50–90, A/S 90. Default: the shortest the rank allows."),
+    boss: z.string().max(60).optional().describe("The boss: what the player will work on, e.g. \"Chapter 3 problem set\". Default: today's unfinished project strike or first unfinished goal."),
+    goal_id: z.string().max(80).optional().describe("Goal id from get_today of a minutes goal (e.g. study) that the session's minutes count toward when the boss is defeated. Default: the unfinished Study goal, if any."),
+    use_key: z.boolean().optional().describe("Spend the highest-rank Dungeon Key in the inventory (rank sets duration and rewards). Default true when a key is held. false or no key = keyless E-rank dungeon, 25 min, half rewards."),
+  }),
+  abandon_dungeon: z.strictObject({}),
   undo_last_log: z.strictObject({}),
   log_past_day: z.strictObject({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("The past day to amend (YYYY-MM-DD). Default: yesterday. Only days that already ended, within the last 7 days."),

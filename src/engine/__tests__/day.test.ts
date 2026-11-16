@@ -150,6 +150,21 @@ describe("day close", () => {
     expect(titles(r.fx)).toContain("PENALTY CLEARED");
     expect(r.s.titles.some((t) => t.id === "overcame-adversity")).toBe(true);
   });
+  it("penalty makeup is paid by doing the same habits today", () => {
+    let r = nextDay(started()); // Monday failed (0/4) → penalty with half targets [1, 30, 4, 2]
+    expect(r.s.penalty!.cleared).toBe(false);
+    const today = r.s.today!;
+    const g = (habit: string) => today.goals.find((x) => x.habitId === habit)!;
+    r = feed(r,
+      { type: "GOAL_PROGRESS", goalId: g("gym").id, delta: 1, at: T("2026-11-03", "08:00") },
+      { type: "GOAL_PROGRESS", goalId: g("study").id, delta: 30, at: T("2026-11-03", "09:00") },
+      { type: "GOAL_SET", goalId: g("sleep").id, value: 4, at: T("2026-11-03", "09:10") });
+    expect(r.s.penalty!.cleared).toBe(false);
+    expect(selectors.penaltyGoals(r.s).filter((v) => v.done)).toHaveLength(3);
+    r = feed(r, { type: "GOAL_PROGRESS", goalId: g("eat").id, delta: 2, at: T("2026-11-03", "12:00") });
+    expect(r.s.penalty!.cleared).toBe(true);
+    expect(titles(r.fx)).toContain("PENALTY CLEARED");
+  });
   it("penalty reminder after expiry, at most once per day", () => {
     let r = nextDay(started());
     const n0 = popups(r.fx).length;

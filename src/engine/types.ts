@@ -77,6 +77,23 @@ export interface Project {
   xpBonus: number;
   resolvedAt?: ISO;
 }
+/** The open Instant Dungeon (focus session). See engine/dungeons.ts. */
+export interface ActiveDungeon {
+  id: string;
+  rank: HunterRank;
+  bossName: string;
+  minutes: number;
+  startedAt: ISO;
+  endsAt: ISO;
+  keyItemId?: string;
+  /** The key consumed on entry (returned if the dungeon is abandoned within 2 minutes). */
+  keyItem?: Item;
+  linkGoalId?: string;
+  /** Entered without a key: E-rank, half rewards. */
+  keyless: boolean;
+  /** The "time up" window was already shown for this dungeon. */
+  timeUpShown?: boolean;
+}
 export interface PendingExtraction { stat: StatId; milestone: number; offeredAt: ISO }
 
 export interface State {
@@ -115,6 +132,7 @@ export interface State {
   lastGymDate?: YMD;
   queuedPopups?: SystemWindowSpec[];                 // held back by quiet hours / Stealth
   projects?: Project[];                              // Project quests (boss fights)
+  dungeon?: ActiveDungeon;                           // the open Instant Dungeon (none when idle)
 }
 
 export type Event =
@@ -138,7 +156,10 @@ export type Event =
   | { type: "SHADOW_EXTRACTED"; stat: StatId; name: string; epithet?: string; at: ISO }
   | { type: "TITLE_EQUIPPED"; titleId: string; at: ISO }
   | { type: "SKILL_USED"; skillId: string; at: ISO; hours?: number /* Stealth duration, default 4 */ }
-  | { type: "DUNGEON_CLEARED"; rank: HunterRank; minutes: number; bossName: string; at: ISO }
+  | { type: "DUNGEON_STARTED"; rank: HunterRank; bossName: string; minutes: number; keyItemId?: string; linkGoalId?: string; at: ISO }
+  /** Claim the open dungeon (or, with none open, a legacy one-off clear). */
+  | { type: "DUNGEON_CLEARED"; rank: HunterRank; minutes?: number; bossName: string; at: ISO }
+  | { type: "DUNGEON_ABANDONED"; at: ISO }
   | { type: "GATE_RESULT"; week: string; cleared: boolean; at: ISO }
   | { type: "CHECKIN_ANSWERED"; habitId: string; yes: boolean; at: ISO }
   | { type: "TICK"; at: ISO }

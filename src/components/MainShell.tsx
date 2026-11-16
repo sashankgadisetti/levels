@@ -19,6 +19,8 @@ import { Shop } from "./screens/Shop";
 import { Status } from "./screens/Status";
 import { TitlesSkills } from "./screens/TitlesSkills";
 import { HowItWorksModal } from "./HowItWorks";
+import { DungeonHud } from "./dungeon/DungeonHud";
+import { EnterDungeon } from "./dungeon/EnterDungeon";
 import { QuickBar } from "./agent/QuickBar";
 import { Btn, Meter } from "./ui/kit";
 
@@ -108,7 +110,8 @@ export function MainShell() {
             <Meter label="XP" value={state.player.xp} max={state.player.xpToNext} tone="purple" title={`XP ${state.player.xp} / ${state.player.xpToNext} to level ${state.player.level + 1}`} />
             <QuickBar />
             <div className="ml-auto flex items-center gap-3">
-              <button className={`pill ${prog.total > 0 && prog.done === prog.total ? "ok" : ""}`} onClick={() => setScreen("daily")} aria-label={`Today's goals: ${prog.done} of ${prog.total} done. Open the Daily Quest`} data-testid="today-pill">
+              <DungeonHud state={state} />
+              <button className={`pill ${prog.total > 0 && prog.done === prog.total ? "ok" : ""} ${state.dungeon ? "max-2xl:hidden" : ""}`} onClick={() => setScreen("daily")} aria-label={`Today's goals: ${prog.done} of ${prog.total} done. Open the Daily Quest`} data-testid="today-pill">
                 {prog.total > 0 && prog.done === prog.total ? "\u2713 " : ""}today: {prog.done}/{prog.total}
               </button>
               <div className="mono tone-gold glow-gold text-[18px]" data-testid="gold">{state.gold} G</div>
@@ -140,6 +143,7 @@ export function MainShell() {
         </>
       )}
       <HowItWorksModal />
+      {accepted && <EnterDungeon />}
       {toast && <div role="status" className="fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 border border-[var(--sl-cyan)] bg-[var(--sl-panel)] px-5 py-2 text-[16px] tone-cyan" style={{ boxShadow: "0 0 18px rgba(63,216,255,.35)" }}>{toast.text}</div>}
     </div>
     </MotionConfig>

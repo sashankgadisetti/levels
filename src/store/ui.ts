@@ -29,7 +29,14 @@ export const useUi = create<{
   /** The first-run hint card on the Daily Quest screen. */
   helpSeen: boolean;
   markHelpSeen(): void;
+  /** Enter Dungeon dialog: open with an optional pre-selected key ("" = keyless). */
+  dungeonDialog?: { keyId?: string };
+  openDungeonDialog(opts?: { keyId?: string }): void;
+  closeDungeonDialog(): void;
 }>((set) => ({
+  dungeonDialog: undefined,
+  openDungeonDialog: (opts = {}) => set({ dungeonDialog: { ...opts } }),
+  closeDungeonDialog: () => set({ dungeonDialog: undefined }),
   screen: initialScreen(),
   setScreen: (screen) => { lsSet(SCREEN_KEY, screen); set({ screen }); },
   showToast(text) {

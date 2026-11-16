@@ -148,7 +148,7 @@ export function penaltyQuest(penalty: Penalty, goals: PenaltyGoalView[]): System
       { type: "text", text: "You failed to clear the Daily Quest.", tone: "red" },
       { type: "timer", endsAt: penalty.endsAt, label: "TIME REMAINING", tone: "red" },
       { type: "kv", rows: [["EFFECTS", "HP DOWN   SHOP LOCKED   STREAKS BROKEN"]] },
-      { type: "text", text: "MAKEUP: clear every objective below to escape.", tone: "dim" },
+      { type: "text", text: "MAKEUP: do half of each missed goal (below). Logging it in today's quest counts.", tone: "dim" },
       ...goals.slice(0, 8).map(penaltyRow),
       { type: "text", text: "The timer does not stop for excuses.", tone: "red" },
     ],
@@ -222,19 +222,79 @@ export function notice(title: string, text: string, tone: "cyan" | "red" | "gold
   return make({ variant: tone === "red" ? "warning" : "info", title: clip(title, 80), blocks: [{ type: "text", text: clip(text, 400), tone }], actions: [close], sound: "ding", timeoutMs: 12_000 });
 }
 
-export function dungeonCleared(rank: HunterRank, boss: string, xp: number, gold: number): SystemWindowSpec {
+export interface DungeonClearExtra { minutes?: number; keyless?: boolean; goalLabel?: string; goalMinutes?: number }
+export function dungeonCleared(rank: HunterRank, boss: string, xp: number, gold: number, extra: DungeonClearExtra = {}): SystemWindowSpec {
+  const rows: [string, string][] = [["REWARD", `XP +${xp}   GOLD +${gold}`]];
+  if (extra.minutes) rows.unshift(["TIME IN DUNGEON", `${extra.minutes} min`]);
+  if (extra.goalLabel) rows.push(["QUEST CREDIT", clip(`${extra.goalLabel} +${extra.goalMinutes ?? extra.minutes ?? 0} min`, 64)]);
   return make({
     variant: "reward", title: "DUNGEON CLEARED", glyph: "crown",
-    blocks: [{ type: "text", text: `${rank}-rank dungeon cleared. ${clip(boss, 40)} eliminated.`, tone: "cyan" }, { type: "kv", rows: [["REWARD", `XP +${xp}   GOLD +${gold}`]] }],
+    blocks: [
+      { type: "text", text: `${rank}-rank dungeon cleared. ${clip(boss, 40)} eliminated.`, tone: "cyan" },
+      { type: "kv", rows },
+      ...(extra.keyless ? [{ type: "text" as const, text: "Entered without a key. Rewards halved.", tone: "dim" as const }] : []),
+    ],
     actions: [close], sound: "ding", timeoutMs: 15_000,
   });
 }
 
-export function dungeonKey(rank: string): SystemWindowSpec {
+/** Dungeon Key used: ENTER opens the Enter Dungeon dialog with this key selected (`arg` = "<rank>:<itemId>"). */
+export function dungeonKey(rank: string, itemId?: string): SystemWindowSpec {
+  const r = clip(rank, 8);
   return make({
+    id: itemId ? clip(`key-${itemId}`, 64) : undefined,
     variant: "gate", title: "DUNGEON KEY", glyph: "diamond",
-    blocks: [{ type: "text", text: `The key resonates. A ${clip(rank, 8)}-rank Instant Dungeon is open.`, tone: "gold" }],
-    actions: [{ label: "ENTER", kind: "start:dungeon", arg: clip(rank, 8), primary: true }, { label: "LATER", kind: "dismiss" }], sound: "ding", timeoutMs: 0,
+    blocks: [
+      { type: "text", text: `The key resonates. A ${r}-rank Instant Dungeon is open.`, tone: "gold" },
+      { type: "text", text: "Name the boss. Set the timer. Stay inside until it ends.", tone: "dim" },
+    ],
+    actions: [{ label: "ENTER", kind: "start:dungeon", arg: clip(itemId ? `${r}:${itemId}` : r, 64), primary: true }, { label: "LATER", kind: "dismiss" }], sound: "ding", timeoutMs: 0,
+  });
+}
+
+export interface DungeonView { id: string; rank: HunterRank; bossName: string; minutes: number; endsAt: string; keyless: boolean; keyItem?: Item }
+/** The open dungeon: countdown, boss, rank, link. [ABANDON] flees. */
+export function dungeonEntered(d: DungeonView, linkLabel?: string): SystemWindowSpec {
+  const rows: [string, string][] = [
+    ["BOSS", clip(d.bossName, 64)],
+    ["RANK", `${d.rank}${d.keyless ? "  (no key: half rewards)" : ""}`],
+    ["DURATION", `${d.minutes} min`],
+  ];
+  if (linkLabel) rows.push(["COUNTS TOWARD", clip(linkLabel, 64)]);
+  return make({
+    id: clip(`dungeon-${d.id}`, 64), variant: "gate", title: `${d.rank}-RANK INSTANT DUNGEON`, glyph: "skull",
+    blocks: [
+      { type: "text", text: "You have entered the dungeon.", tone: "gold", align: "center" },
+      { type: "timer", endsAt: d.endsAt, label: "UNTIL THE BOSS FALLS" },
+      { type: "kv", rows },
+      { type: "text", text: "Stay until the timer ends. Leaving now forfeits the reward.", tone: "dim" },
+    ],
+    actions: [{ label: "ABANDON", kind: "dungeon:abandon" }, { label: "CLOSE", kind: "dismiss", primary: true }],
+    sound: "ding", timeoutMs: 0,
+  });
+}
+
+/** The timer ran out: the player confirms whether they stayed. */
+export function dungeonTimeUp(d: DungeonView): SystemWindowSpec {
+  return make({
+    id: clip(`dungeon-up-${d.id}`, 64), variant: "gate", title: "BOSS DEFEATED?", glyph: "crown",
+    blocks: [
+      { type: "text", text: clip(`${d.bossName} · ${d.minutes} min. Did you stay in the dungeon?`, 400), tone: "gold" },
+      ...(d.keyless ? [{ type: "text" as const, text: "No key was used. Rewards are halved.", tone: "dim" as const }] : []),
+    ],
+    actions: [{ label: "CLAIM VICTORY", kind: "dungeon:claim", primary: true }, { label: "FLED", kind: "dungeon:abandon" }],
+    sound: "levelup", timeoutMs: 0,
+  });
+}
+
+export function dungeonAbandoned(d: DungeonView, refunded: boolean): SystemWindowSpec {
+  return make({
+    variant: "warning", title: "DUNGEON ABANDONED", glyph: "alert",
+    blocks: [
+      { type: "text", text: clip(`You left ${d.bossName} standing. The dungeon closes behind you.`, 400), tone: "dim" },
+      { type: "text", text: refunded ? "The gate had barely opened. The key returns to your inventory." : "No reward.", tone: refunded ? "cyan" : "red" },
+    ],
+    actions: [close], sound: "ding", timeoutMs: 12_000,
   });
 }
 

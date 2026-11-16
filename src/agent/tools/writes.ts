@@ -168,6 +168,46 @@ export const WRITE_TOOLS: ToolSpec[] = [
     },
   }),
   defineTool({
+    name: "start_dungeon", mutating: true, schema: SCHEMAS.start_dungeon,
+    description: "Open an Instant Dungeon: a timed focus session (25/50/90 min) against a named boss (the task). Spends the highest-rank Dungeon Key unless use_key is false; without a key it is an E-rank, 25-minute dungeon with half rewards. Minutes are clamped to the rank (E 25, D 25–50, C 50, B 50–90, A/S 90). When the timer ends the System asks the player whether they stayed; claiming pays XP/gold and adds the minutes to the linked goal (goal_id, default Study). Only one dungeon can be open at a time.",
+    run(args) {
+      const s = getState(); if (!s) return noState();
+      if (!s.player.accepted) return fail("The player has not registered yet.");
+      if (s.dungeon) return fail(`A dungeon is already open: ${s.dungeon.rank}-rank, ${s.dungeon.bossName}, ends ${s.dungeon.endsAt}. Use abandon_dungeon first.`);
+      const keys = selectors.dungeonKeys(s);
+      const key = args.use_key === false ? undefined : keys[0];
+      if (args.use_key === true && !key) return fail("No Dungeon Key in the inventory. Call again with use_key:false for a keyless E-rank dungeon.");
+      let link = selectors.defaultLinkGoal(s);
+      if (args.goal_id) {
+        link = selectors.linkableGoals(s).find((g) => g.id === args.goal_id);
+        if (!link) return fail(`Goal "${args.goal_id}" is not one of today's minutes goals (options: ${selectors.linkableGoals(s).map((g) => g.id).join(", ") || "none"}).`);
+      }
+      const rank = key?.rank ?? "E";
+      const minutes = selectors.clampDungeonMinutes(rank, args.minutes);
+      const bossName = args.boss?.trim() || selectors.defaultBossName(s);
+      dispatch({ type: "DUNGEON_STARTED", rank, bossName, minutes, ...(key ? { keyItemId: key.item.id } : {}), ...(link ? { linkGoalId: link.id } : {}) });
+      const d = getState()?.dungeon;
+      if (!d) return fail("The System refused to open the dungeon.");
+      const clamped = args.minutes !== undefined && args.minutes !== d.minutes ? ` (asked ${args.minutes}, ${d.rank}-rank allows ${selectors.dungeonBoundsFor(d.rank).min}–${selectors.dungeonBoundsFor(d.rank).max})` : "";
+      const content = `[DUNGEON ENTERED] ${d.rank}-rank · ${d.bossName} · ${d.minutes} min${clamped} · ends ${d.endsAt}${d.keyless ? " · no key: half rewards" : ` · key ${d.keyItem?.name ?? d.keyItemId} spent`}${link ? ` · counts toward ${link.label}` : ""}.`;
+      return ok(content, { id: d.id, rank: d.rank, boss: d.bossName, minutes: d.minutes, started_at: d.startedAt, ends_at: d.endsAt, keyless: d.keyless, key_item_id: d.keyItemId ?? null, goal_id: d.linkGoalId ?? null, seconds_left: selectors.dungeonSecondsLeft(getState()!, agentEnv.now().toISOString()) }, true);
+    },
+  }),
+  defineTool({
+    name: "abandon_dungeon", mutating: true, schema: SCHEMAS.abandon_dungeon,
+    description: "Leave the open Instant Dungeon without a reward. If it was entered with a key less than 2 minutes ago, the key is returned to the inventory. Use when the player says they have to stop the focus session.",
+    run() {
+      const s = getState(); if (!s) return noState();
+      const d = s.dungeon;
+      if (!d) return fail("No dungeon is open.");
+      dispatch({ type: "DUNGEON_ABANDONED" });
+      const after = getState();
+      if (after?.dungeon) return fail("The dungeon did not close.");
+      const refunded = !!d.keyItemId && !!after?.inventory.some((i) => i.id === d.keyItemId);
+      return ok(`[DUNGEON ABANDONED] ${d.bossName} left standing.${refunded ? " The key was returned." : " No reward."}`, { id: d.id, refunded }, true);
+    },
+  }),
+  defineTool({
     name: "log_past_day", mutating: true, schema: SCHEMAS.log_past_day,
     description: "Amend a day that already ended (default yesterday; up to 7 days back): mark the given habits complete for that day, or all of its unfinished goals when habit_ids is omitted. Pays the rewards that day would have paid, repairs streaks and lifts a penalty those goals caused. Use when the player says they did things on a past day but never logged them.",
     run(args, ctx) {

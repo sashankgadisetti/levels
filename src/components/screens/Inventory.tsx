@@ -1,16 +1,21 @@
 import { useState } from "react";
 import type { Item } from "../../engine";
 import { dispatch, useGameState } from "../../store/game";
+import { useUi } from "../../store/ui";
 import { playSound } from "../system/sound";
 import { Btn, Empty, Panel } from "../ui/kit";
 
 const RARITY: Record<string, string> = { common: "var(--sl-muted)", rare: "var(--sl-cyan)", epic: "var(--sl-purple)", legendary: "var(--sl-gold)" };
+const isKey = (i: Item) => i.defId === "dungeon-key";
 
 export function Inventory() {
   const s = useGameState();
   const [sel, setSel] = useState<string>();
+  const openDungeon = useUi((u) => u.openDungeonDialog);
   const item: Item | undefined = s.inventory.find((i) => i.id === sel);
   const open = () => { playSound("ding"); dispatch({ type: "BOX_OPENED", seed: Math.floor(Math.random() * 2 ** 31) }); };
+  const enter = (i: Item) => openDungeon({ keyId: i.id });
+  const inDungeon = !!s.dungeon;
   return (
     <div className="mx-auto grid max-w-[980px] gap-5">
       <Panel title="Random Boxes" accent="gold">
@@ -26,11 +31,17 @@ export function Inventory() {
               {s.inventory.map((i) => {
                 const c = RARITY[i.rarity];
                 return (
-                  <button key={i.id} onClick={() => setSel(i.id)} className="flex aspect-square flex-col items-center justify-center gap-2 p-2 text-center"
-                    style={{ border: `1px solid ${c}`, background: `color-mix(in srgb, ${c} ${sel === i.id ? 20 : 7}%, transparent)`, boxShadow: sel === i.id ? `0 0 14px ${c}` : "none" }}>
-                    <span className="text-[26px]" style={{ color: c, textShadow: `0 0 8px ${c}` }}>&#9670;</span>
-                    <span className="text-[14px] leading-tight">{i.name}</span>
-                  </button>
+                  <div key={i.id} className="relative">
+                    <button onClick={() => setSel(i.id)} className="flex aspect-square w-full flex-col items-center justify-center gap-2 p-2 text-center"
+                      style={{ border: `1px solid ${c}`, background: `color-mix(in srgb, ${c} ${sel === i.id ? 20 : 7}%, transparent)`, boxShadow: sel === i.id ? `0 0 14px ${c}` : "none" }}>
+                      <span className="text-[26px]" style={{ color: c, textShadow: `0 0 8px ${c}` }}>&#9670;</span>
+                      <span className="text-[14px] leading-tight">{i.name}</span>
+                    </button>
+                    {isKey(i) && (
+                      <Btn sm primary className="!absolute bottom-1.5 left-1/2 -translate-x-1/2" disabled={inDungeon} onClick={() => enter(i)}
+                        aria-label={`Enter a dungeon with ${i.name}`} data-testid={`enter-${i.id}`}>[ENTER]</Btn>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -42,7 +53,9 @@ export function Inventory() {
               <div className="text-[20px]" style={{ color: RARITY[item.rarity] }}>{item.name}</div>
               <div className="sub" style={{ color: RARITY[item.rarity] }}>{item.rarity}</div>
               <p className="m-0 text-[15px] normal-case tone-dim">{item.description}</p>
-              <Btn primary disabled={!item.consumable} onClick={() => { dispatch({ type: "ITEM_USED", itemId: item.id }); setSel(undefined); }}>[USE]</Btn>
+              {isKey(item)
+                ? <Btn primary disabled={inDungeon} title={inDungeon ? "A dungeon is already open" : undefined} onClick={() => enter(item)}>[ENTER DUNGEON]</Btn>
+                : <Btn primary disabled={!item.consumable} onClick={() => { dispatch({ type: "ITEM_USED", itemId: item.id }); setSel(undefined); }}>[USE]</Btn>}
             </div>
           )}
         </Panel>

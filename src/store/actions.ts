@@ -1,5 +1,6 @@
 /** Maps a System-window Action (from a pop-up button or in-block control) to events / navigation. */
-import type { StatId } from "../engine";
+import { selectors, windows, type StatId } from "../engine";
+import { routeEffects } from "./effects";
 import type { Action } from "../system/spec";
 import { focusMainWindow } from "../lib/tauri";
 import { gameStore } from "./game";
@@ -37,7 +38,11 @@ export function handleAction(action: Action, ctx: { windowId?: string } = {}): v
       const id = arg.slice(0, cut);
       const g = goal(id);
       const delta = Number(arg.slice(cut + 1));
-      if (!g || !Number.isFinite(delta) || delta === 0) return;
+      if (!Number.isFinite(delta) || delta === 0) return;
+      if (!g) { // a makeup row in the Penalty window refers to yesterday's goal
+        if (state.penalty && !state.penalty.cleared && state.penalty.missedGoalIds.includes(id) && delta > 0) dispatch({ type: "PENALTY_PROGRESS", goalId: id, delta });
+        return;
+      }
       if (delta > 0) dispatch({ type: "GOAL_PROGRESS", goalId: id, delta });
       else dispatch({ type: "GOAL_SET", goalId: id, value: Math.max(0, g.current + delta) });
       return;
@@ -49,6 +54,11 @@ export function handleAction(action: Action, ctx: { windowId?: string } = {}): v
     case "complete:goal": {
       const g = goal(action.arg);
       if (g && !g.done) dispatch({ type: "GOAL_PROGRESS", goalId: g.id, delta: Math.max(1, g.target - g.current) });
+      else if (!g && action.arg && state.penalty && !state.penalty.cleared && state.penalty.missedGoalIds.includes(action.arg)) {
+        // "Done" on a makeup row in the Penalty window: finish that row's half target.
+        const view = selectors.penaltyGoals(state).find((v) => v.goalId === action.arg);
+        dispatch({ type: "PENALTY_PROGRESS", goalId: action.arg, delta: Math.max(1, (view?.target ?? 1) - (view?.current ?? 0)) });
+      }
       return;
     }
     case "allocate:points": {
@@ -70,8 +80,24 @@ export function handleAction(action: Action, ctx: { windowId?: string } = {}): v
       else { ui.setScreen("shadows"); void focusMainWindow(); }
       return;
     }
-    case "start:dungeon":
-      ui.setScreen("daily"); void focusMainWindow();
+    case "start:dungeon": {
+      // arg: "<rank>:<itemId>" from a Dungeon Key window (a bare rank from older windows / the Oracle)
+      const arg = action.arg ?? "";
+      const cut = arg.indexOf(":");
+      const keyId = cut >= 0 ? arg.slice(cut + 1) : undefined;
+      const key = state.inventory.find((i) => i.id === keyId && i.defId === "dungeon-key");
+      if (state.dungeon) { routeEffects([{ kind: "popup", spec: windows.dungeonEntered(state.dungeon, state.today?.goals.find((g) => g.id === state.dungeon!.linkGoalId)?.label) }]); return; }
+      ui.openDungeonDialog(key ? { keyId: key.id } : {});
+      void focusMainWindow();
+      return;
+    }
+    case "dungeon:claim": {
+      const d = state.dungeon;
+      if (d) dispatch({ type: "DUNGEON_CLEARED", rank: d.rank, minutes: d.minutes, bossName: d.bossName });
+      return;
+    }
+    case "dungeon:abandon":
+      if (state.dungeon) dispatch({ type: "DUNGEON_ABANDONED" });
       return;
     default:
       return; // dismiss / accept / decline: nothing to do
