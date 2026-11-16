@@ -154,7 +154,11 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         focus_main(app);
     }));
-    // TODO(updater): add tauri-plugin-updater once release signing keys exist (see SETUP.md).
+    // In-app auto-update from GitHub Releases' latest.json (see SETUP.md → Updater); process: relaunch after install.
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
     builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::default().build())

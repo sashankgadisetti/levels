@@ -29,6 +29,12 @@ jobs:
       # Code signing is optional. Without the secrets the app is ad-hoc signed (signingIdentity "-" in
       # tauri.conf.json), which avoids the "is damaged" error on Apple Silicon. Export the APPLE_* secrets only when they are set: an empty
       # APPLE_CERTIFICATE makes Tauri try (and fail) to import a certificate.
+      # Auto-update: when TAURI_SIGNING_PRIVATE_KEY is set (contents of the key from `tauri signer generate`, see SETUP.md),
+      # tauri-action signs the updater bundle (createUpdaterArtifacts in tauri.conf.json) and uploads latest.json +
+      # Levels.app.tar.gz(.sig) to the release; installed apps poll releases/latest/download/latest.json. Without the key the
+      # build still works but produces no update artifacts
+      # (createUpdaterArtifacts is switched off via TAURI_EXTRA_ARGS). The key password may legitimately be empty, so it is exported
+      # whenever the private key is set.
       - name: Export signing secrets if configured
         shell: bash
         env:
@@ -38,16 +44,28 @@ jobs:
           S_APPLE_ID: ${{ secrets.APPLE_ID }}
           S_APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           S_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          S_TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          S_TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           for k in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             v="S_$k"; v="${!v}"
             if [ -n "$v" ]; then { echo "$k<<__EOF__"; echo "$v"; echo "__EOF__"; } >> "$GITHUB_ENV"; echo "$k: set"; else echo "$k: not set (unsigned build)"; fi
           done
+          if [ -n "$S_TAURI_SIGNING_PRIVATE_KEY" ]; then
+            { echo "TAURI_SIGNING_PRIVATE_KEY<<__EOF__"; echo "$S_TAURI_SIGNING_PRIVATE_KEY"; echo "__EOF__"; } >> "$GITHUB_ENV"
+            { echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<__EOF__"; echo "$S_TAURI_SIGNING_PRIVATE_KEY_PASSWORD"; echo "__EOF__"; } >> "$GITHUB_ENV"
+            echo "TAURI_SIGNING_PRIVATE_KEY: set (update bundles + latest.json will be signed and uploaded)"
+          else
+            # `tauri build` refuses createUpdaterArtifacts without a private key, so switch it off for this build only.
+            echo '{"bundle":{"createUpdaterArtifacts":false}}' > "$RUNNER_TEMP/no-updater.json"
+            echo "TAURI_EXTRA_ARGS=--config $RUNNER_TEMP/no-updater.json" >> "$GITHUB_ENV"
+            echo "TAURI_SIGNING_PRIVATE_KEY: not set (no auto-update artifacts)"
+          fi
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --target universal-apple-darwin
+          args: --target universal-apple-darwin ${{ env.TAURI_EXTRA_ARGS }}
           # On a v* tag: create a GitHub Release and attach the .dmg (pre-release while unsigned).
           # On a manual run (no tag): just build and upload the artifact below.
           tagName: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}

@@ -21,6 +21,10 @@
     "global-shortcut:default",
     "autostart:default",
     "store:default",
-    "opener:default"
+    "opener:default",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
+    "process:allow-restart"
   ]
 }
