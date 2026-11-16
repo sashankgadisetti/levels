@@ -11,6 +11,7 @@ import { statLabel } from "../../lib/derive";
 import { dispatch, nowMs, useGameState } from "../../store/game";
 import { useUi } from "../../store/ui";
 import { SystemWindow } from "../system/SystemWindow";
+import { agentClaudeEnabled } from "../../agent/budget";
 import { Btn, Chip, Empty, Field, Panel, SBar } from "../ui/kit";
 
 const DAYS: Weekday[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -85,14 +86,14 @@ export function Projects() {
     <div className="mx-auto flex max-w-[980px] flex-col gap-5">
       {pending && pendingSpec && (
         <div className="flex flex-col items-center gap-2" data-testid="gate-plan">
-          <SystemWindow key={`${pending.project.id}-${pending.n}`} spec={pendingSpec} width={560}
+          <SystemWindow key={`${pending.project.id}-${pending.n}`} spec={{ ...pendingSpec, actions: [] }} width={560}
             onAction={(a) => { if (a.kind === "accept") accept(pending); }} onDismiss={() => setPending((x) => (x === pending ? undefined : x))} />
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Btn primary onClick={() => accept(pending)}>[ACCEPT]</Btn>
             <Btn disabled={!!busy} onClick={() => rerun(pending)}>{busy ? "[ANALYSING...]" : "[RE-PLAN]"}</Btn>
             <Btn onClick={() => setPending(undefined)}>[CANCEL]</Btn>
           </div>
-          <p className="sub m-0 normal-case">{pending.plan.source === "claude" ? `Planned by the Oracle${pending.plan.costUsd ? ` ($${pending.plan.costUsd.toFixed(3)})` : ""}.` : pending.plan.note ?? "Deterministic plan."}</p>
+          <p className="sub m-0 normal-case">{pending.plan.source === "claude" ? `Planned by the System (Claude)${pending.plan.costUsd ? ` ($${pending.plan.costUsd.toFixed(3)})` : ""}.` : pending.plan.note ?? "Deterministic plan."}</p>
         </div>
       )}
 
@@ -131,7 +132,7 @@ export function Projects() {
           <div className="sys-actions">
             <Btn primary type="submit" disabled={!!busy || !!pending}>{busy === "new" ? "[ANALYSING GATE...]" : "[OPEN A GATE]"}</Btn>
           </div>
-          {!s.config.oracle.enabled && <p className="sub mb-0 mt-2 normal-case">The Oracle is off: plans use the deterministic template (Plan, Build, Polish, Ship).</p>}
+          {!agentClaudeEnabled() && <p className="sub mb-0 mt-2 normal-case">Claude is switched off for agent features (Settings → Agent): plans use the deterministic template (Plan, Build, Polish, Ship).</p>}
         </form>
       </Panel>
 

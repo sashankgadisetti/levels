@@ -7,9 +7,10 @@ import { useUi } from "../../store/ui";
 import { Btn, Field, Panel, SBar, Toggle } from "../ui/kit";
 import { playSound } from "../system/sound";
 import { askTheSystem, lastOracleError, oracleSpentTodayUsd, regenerateToday, testOracle } from "../../oracle/wire";
+import { AgentSettings } from "../agent/AgentSettings";
 
 const DAYS: Weekday[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const TABS = [["general", "General"], ["goals", "Goals"], ["popups", "Pop-ups"], ["oracle", "Oracle"], ["data", "Data"]] as const;
+const TABS = [["general", "General"], ["goals", "Goals"], ["popups", "Pop-ups"], ["oracle", "Oracle"], ["agent", "Agent"], ["data", "Data"]] as const;
 type Tab = (typeof TABS)[number][0];
 const KINDS: HabitDef["kind"][] = ["count", "minutes", "hours", "check"];
 const KIND_LABEL: Record<HabitDef["kind"], string> = { count: "Count (meals, sessions)", minutes: "Minutes", hours: "Hours", check: "Yes / no" };
@@ -271,6 +272,8 @@ export function Settings() {
             {askError && <div className="error-inline mt-2" role="alert">{askError}</div>}
           </Panel>
         )}
+
+        {tab === "agent" && <AgentSettings budgetUsd={cfg.oracle.dailyBudgetUsd} />}
 
         {tab === "data" && (
           <Panel title="Data" accent="red">

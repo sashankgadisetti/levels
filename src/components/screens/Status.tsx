@@ -3,6 +3,7 @@ import { GRADE_COLOR, RANK_COLOR, gradeOf, vitalMax } from "../../lib/derive";
 import { dispatch, useGameState } from "../../store/game";
 import { playSound } from "../system/sound";
 import { Btn, Panel, Rank, SBar } from "../ui/kit";
+import { ReevaluateButton } from "../agent/ReevaluateButton";
 
 export function Status() {
   const s = useGameState();
@@ -100,6 +101,7 @@ export function Status() {
           </div>
         )}
         <p className="sub mt-3 text-center" style={{ color: RANK_COLOR[s.player.rank] }}>Hunter rank {s.player.rank}</p>
+        <div className="mt-3 flex items-center justify-center gap-3"><span className="sub">Weekly review of targets and next Gate</span><ReevaluateButton /></div>
       </Panel>
     </div>
   );

@@ -13,6 +13,7 @@ import type { Config, Project, ProjectStrike, StatId, Weekday, YMD } from "../..
 import { LocalStorageOracleCache, type OracleCache } from "../../oracle/cache";
 import { costOf, describeError, type OracleUsage } from "../../oracle/client";
 import { getOracleApiKey } from "../../store/settings";
+import { agentClaudeEnabled } from "../budget";
 
 export const PLAN_MODEL = "claude-opus-5-5";
 export const DEFAULT_MINUTES = 45;
@@ -47,6 +48,8 @@ export interface PlanResponse { content: { type: string; text?: string }[]; stop
 export interface PlanClientLike { beta: { messages: { create(params: Anthropic.Beta.MessageCreateParamsNonStreaming): Promise<PlanResponse> } } }
 
 export interface PlanDeps {
+  /** Agent "Use Claude" switch (default: the Settings → Agent toggle). */
+  useClaude?: () => boolean;
   getApiKey?: () => string | null | undefined | Promise<string | null | undefined>;
   /** Oracle settings (enabled + dailyBudgetUsd are honoured). Default: DEFAULT_CONFIG.oracle. */
   oracle?: Config["oracle"];
@@ -219,7 +222,7 @@ async function callClaude(input: PlanInput, deps: PlanDeps, prompt: string, keep
   const log = deps.log ?? ((m, e) => console.warn(`[projects] ${m}`, e ?? ""));
   const spendKey = `oracle:spend:${localYmd(now())}`; // shared with the Oracle's daily budget
   const spent = cache.get<number>(spendKey) ?? 0;
-  if (!oracle.enabled) return { plan: null, note: "Oracle is off: deterministic plan." };
+  if (!(deps.useClaude ?? agentClaudeEnabled)()) return { plan: null, note: "Claude is switched off for agent features: deterministic plan." };
   if (spent >= oracle.dailyBudgetUsd) return { plan: null, note: `Daily Oracle budget reached ($${oracle.dailyBudgetUsd}): deterministic plan.` };
   const apiKey = await (deps.getApiKey ?? getOracleApiKey)();
   if (!apiKey) return { plan: null, note: "No API key: deterministic plan." };

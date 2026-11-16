@@ -6,6 +6,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { StoreApi } from "zustand/vanilla";
 import { focusMainWindow } from "../lib/tauri";
+import { getOracle } from "../oracle/wire";
 import { routeEffects } from "../store/effects";
 import { gameStore, nowMs, type GameStore } from "../store/game";
 import { getOracleApiKey } from "../store/settings";
@@ -36,7 +37,6 @@ export const defaultAgentEnv: AgentEnv = {
   async ask(question) {
     const state = gameStore.getState().state;
     if (!state) return null;
-    const { getOracle } = await import("../oracle/wire");
     const r = await getOracle().ask(state, question);
     return r ? specToText(r.spec) : null;
   },

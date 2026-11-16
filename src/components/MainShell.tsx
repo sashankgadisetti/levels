@@ -19,6 +19,7 @@ import { Shop } from "./screens/Shop";
 import { Status } from "./screens/Status";
 import { TitlesSkills } from "./screens/TitlesSkills";
 import { HowItWorksModal } from "./HowItWorks";
+import { QuickBar } from "./agent/QuickBar";
 import { Btn, Meter } from "./ui/kit";
 
 const VIEWS: Record<Screen, () => React.ReactElement> = {
@@ -105,6 +106,7 @@ export function MainShell() {
             <Meter label="HP" value={state.vitals.hp} max={max!.hp} tone="red" />
             <Meter label="MP" value={state.vitals.mp} max={max!.mp} tone="blue" />
             <Meter label="XP" value={state.player.xp} max={state.player.xpToNext} tone="purple" title={`XP ${state.player.xp} / ${state.player.xpToNext} to level ${state.player.level + 1}`} />
+            <QuickBar />
             <div className="ml-auto flex items-center gap-3">
               <button className={`pill ${prog.total > 0 && prog.done === prog.total ? "ok" : ""}`} onClick={() => setScreen("daily")} aria-label={`Today's goals: ${prog.done} of ${prog.total} done. Open the Daily Quest`} data-testid="today-pill">
                 {prog.total > 0 && prog.done === prog.total ? "\u2713 " : ""}today: {prog.done}/{prog.total}

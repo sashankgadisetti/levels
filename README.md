@@ -29,6 +29,15 @@ See [SETUP.md](SETUP.md): Xcode CLT + Rust + Node 20, `npm run tauri build`, the
 
 The System windows are a second, frameless, transparent, always-on-top Tauri window (`system.html`). The main window asks Rust to `show_system_window`; Rust places it 24px from the top-right of the monitor under your cursor and shows it without taking focus, so it appears over whatever you are doing, even when the main window is hidden in the tray. Buttons that need the app call `open_main`, which focuses the main window and emits `levels://open-screen`.
 
+## Agent & MCP
+
+- **Quick bar** (Cmd/Ctrl+J): "did legs, 30 min of the Rust book, 2 clean meals" → Claude parses it, you confirm, it's logged.
+- **Weekly re-evaluation** (Status → [RE-EVALUATE], offered Sunday evenings): the System reads your history, proposes target changes within ±25% and names next week's Gate; nothing applies until you accept.
+- **Gates** (project boss fights): name a real goal with a deadline; Claude breaks it into milestones and a daily ⚔ strike that appears in your Daily Quest; re-plan weekly.
+- **MCP server** (`mcp/`): talk to Levels from Claude Desktop or Claude Code ("log my workout", "how's my week"). 16 tools, resources and prompts over a token-protected localhost API. Setup in [mcp/README.md](mcp/README.md).
+
+Design: [docs/06-agentic.md](docs/06-agentic.md).
+
 ## Docs
 
 | | |
