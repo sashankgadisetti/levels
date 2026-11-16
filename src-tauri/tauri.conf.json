@@ -68,6 +68,7 @@
     "longDescription": "Levels turns your daily habits into a Solo Leveling-style life RPG with floating System pop-up windows, stats, streaks and rewards.",
     "macOS": {
       "minimumSystemVersion": "12.0",
+      "signingIdentity": "-",
       "dmg": {
         "windowSize": {
           "width": 660,

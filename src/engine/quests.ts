@@ -2,6 +2,8 @@ import { clamp } from "./vitals";
 import { dayBounds, weekdayOf } from "./time";
 import type { Config, DailyQuest, Goal, HabitDef, ISO, YMD } from "./types";
 
+/** How many days back a finished day can still be logged (PAST_DAY_LOGGED). */
+export const BACKFILL_DAYS = 7;
 export const goalIdFor = (date: YMD, habitId: string) => `${date}:${habitId}`;
 
 export function scaledTarget(h: HabitDef, level: number): number {

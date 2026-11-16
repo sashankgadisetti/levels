@@ -26,7 +26,8 @@ jobs:
         with:
           workspaces: src-tauri
       - run: npm ci
-      # Code signing is optional. Export the APPLE_* secrets only when they are set: an empty
+      # Code signing is optional. Without the secrets the app is ad-hoc signed (signingIdentity "-" in
+      # tauri.conf.json), which avoids the "is damaged" error on Apple Silicon. Export the APPLE_* secrets only when they are set: an empty
       # APPLE_CERTIFICATE makes Tauri try (and fail) to import a certificate.
       - name: Export signing secrets if configured
         shell: bash
@@ -55,8 +56,10 @@ jobs:
             **Levels** — a Solo Leveling–style life RPG for macOS (universal: Apple Silicon + Intel).
 
             **Install:** open the `.dmg` and drag Levels into Applications.
-            **First launch:** this build is not notarized yet, so right-click Levels → Open, or run
-            `xattr -dr com.apple.quarantine /Applications/Levels.app`.
+            **First launch:** this build is not notarized, so macOS blocks it and offers "Move to Trash".
+            Click **Done** (not Move to Trash), then run this once in Terminal and open Levels again:
+            `xattr -cr /Applications/Levels.app`
+            (or: System Settings → Privacy & Security → scroll down → **Open Anyway**).
 
             Your data lives in `~/Library/Application Support/dev.levels.app/levels.db`.
             Optional Oracle (Claude-generated quests): Settings → Oracle → paste an Anthropic API key.

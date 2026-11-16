@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fmtHMS } from "../../lib/format";
 import { GRADE_COLOR, gradeOf, nextDayEnd, questProgress, statShort } from "../../lib/derive";
 import { useNow } from "../../lib/hooks";
@@ -7,7 +8,7 @@ import { selectors, weekdayOf, type Goal, type State } from "../../engine";
 import { GoalRow } from "../system/blocks";
 import { usePopups } from "../../store/popups";
 import { useUi } from "../../store/ui";
-import { Empty, Panel } from "../ui/kit";
+import { Btn, Empty, Panel } from "../ui/kit";
 import { HowItWorksCard } from "../HowItWorks";
 
 export function DailyQuest() {
@@ -72,6 +73,7 @@ export function DailyQuest() {
         )}
       </Panel>
       {!helpSeen && !popupsOpen && <HowItWorksCard />}
+      <PastDays s={s} now={now} />
       <Panel title="History">
         {s.history.length === 0 ? <Empty>No finished days yet. Each day you close shows up here as a letter grade.</Empty> : (
           <div className="flex flex-wrap gap-2">
@@ -103,4 +105,47 @@ function restTitle(s: State, g: Goal): string {
 function PenaltyTimer({ endsAt }: { endsAt: string }) {
   const now = useNow();
   return <span className="mono tone-red text-[28px]" style={{ textShadow: "0 0 14px var(--sl-red)" }}>{fmtHMS((Date.parse(endsAt) - now.getTime()) / 1000)}</span>;
+}
+
+/** Log goals for days that already ended (the app was closed, or a goal was done but never ticked off). */
+function PastDays({ s, now }: { s: State; now: Date }) {
+  const days = selectors.pastDays(s, now.toISOString());
+  const [open, setOpen] = useState<string>();
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  if (!days.length) return null;
+  const toggle = (date: string) => { setOpen(open === date ? undefined : date); setPicked({}); };
+  return (
+    <Panel title="Log a past day">
+      <p className="copy dim mb-3">Did the work but could not log it? Pick the day, tick what you completed, and the System pays the rewards and repairs your streaks.</p>
+      <div className="grid gap-2">
+        {days.map(({ date, quest, recorded }) => {
+          const todo = quest.goals.filter((g) => !g.done);
+          const ids = todo.filter((g) => picked[g.habitId]).map((g) => g.habitId);
+          return (
+            <div key={date} className="sys-goal !block" data-testid={`past-${date}`}>
+              <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => toggle(date)} aria-expanded={open === date}>
+                <span className="n">{weekdayOf(date)} {date.slice(5)}<small>{recorded ? `${quest.goals.length - todo.length}/${quest.goals.length} done` : "not logged"}</small></span>
+                <span className="sub">{open === date ? "Close" : "Log"}</span>
+              </button>
+              {open === date && (
+                <div className="mt-3 grid gap-2">
+                  {todo.map((g) => (
+                    <label key={g.id} className="flex cursor-pointer items-center gap-3 text-[17px]">
+                      <input type="checkbox" checked={!!picked[g.habitId]} onChange={(e) => setPicked({ ...picked, [g.habitId]: e.target.checked })} />
+                      <span>{g.label}</span>
+                      <span className="mono tone-dim text-[14px]">{g.target} {g.unit} · {statShort(s.config, g.stat)}</span>
+                    </label>
+                  ))}
+                  <div className="mt-1 flex gap-2">
+                    <Btn sm onClick={() => setPicked(Object.fromEntries(todo.map((g) => [g.habitId, true])))}>Select all</Btn>
+                    <Btn sm primary disabled={!ids.length} onClick={() => { dispatch({ type: "PAST_DAY_LOGGED", date, habitIds: ids }); setOpen(undefined); setPicked({}); }}>Log {ids.length || ""} completed</Btn>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
 }
